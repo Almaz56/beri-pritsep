@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # Backend API
+  api:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    container_name: beripritsep-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - HOST=0.0.0.0
+    env_file:
+      - ../server/.env
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+    networks:
+      - beripritsep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Web App
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: beripritsep-web
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=https://api.beripritsep.ru/api
+    networks:
+      - beripritsep-network
+
+  # Admin Panel
+  admin:
+    build:
+      context: ../admin
+      dockerfile: Dockerfile
+    container_name: beripritsep-admin
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=https://api.beripritsep.ru/api
+    networks:
+      - beripritsep-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: beripritsep-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+      - web
+      - admin
+    networks:
+      - beripritsep-network
+
+  # PostgreSQL Database (for future use)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: beripritsep-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: beripritsep
+  #     POSTGRES_USER: beripritsep
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - beripritsep-network
+
+  # Redis Cache (for future use)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: beripritsep-redis
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - beripritsep-network
+
+volumes:
+  uploads:
+  logs:
+  # postgres_data:
+  # redis_data:
+
+networks:
+  beripritsep-network:
+    driver: bridge

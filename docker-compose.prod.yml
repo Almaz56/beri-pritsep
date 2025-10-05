@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Backend API Server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: trailer-go-server
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - JWT_SECRET=${JWT_SECRET}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ALLOW_DEV_AUTH=false
+      - TINKOFF_TERMINAL_KEY=${TINKOFF_TERMINAL_KEY}
+      - TINKOFF_SECRET_KEY=${TINKOFF_SECRET_KEY}
+      - TINKOFF_SANDBOX=${TINKOFF_SANDBOX:-true}
+      - FRONTEND_URL=${FRONTEND_URL:-https://app.beripritsep.ru}
+      - BACKEND_URL=${BACKEND_URL:-https://api.beripritsep.ru}
+      - UPLOAD_PATH=/app/uploads
+      - MAX_FILE_SIZE=10485760
+    volumes:
+      - ./server/uploads:/app/uploads
+      - ./server/logs:/app/logs
+    ports:
+      - "8080:8080"
+    networks:
+      - trailer-network
+
+  # Frontend Web App
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: trailer-go-web
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=${BACKEND_URL:-https://api.beripritsep.ru}
+      - VITE_TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+    ports:
+      - "3000:80"
+    networks:
+      - trailer-network
+
+  # Admin Panel
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: trailer-go-admin
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=${BACKEND_URL:-https://api.beripritsep.ru}
+    ports:
+      - "3001:80"
+    networks:
+      - trailer-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: trailer-go-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - server
+      - web
+      - admin
+    networks:
+      - trailer-network
+
+networks:
+  trailer-network:
+    driver: bridge
+
+volumes:
+  uploads:
+  logs:
