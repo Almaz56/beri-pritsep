@@ -87,8 +87,8 @@ const TrailersPage: React.FC = () => {
                 </div>
                 <div className="spec-item">
                   <span className="spec-label">Статус:</span>
-                  <span className={`status ${trailer.isAvailable ? 'available' : 'unavailable'}`}>
-                    {trailer.isAvailable ? 'Доступен' : 'Недоступен'}
+                  <span className={`status ${trailer.status === 'AVAILABLE' ? 'available' : 'unavailable'}`}>
+                    {trailer.status === 'AVAILABLE' ? 'Доступен' : 'Недоступен'}
                   </span>
                 </div>
               </div>
