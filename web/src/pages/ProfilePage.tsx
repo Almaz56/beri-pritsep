@@ -17,7 +17,7 @@ const ProfilePage: React.FC = () => {
 
   // Автоматическая проверка статуса телефона каждые 5 секунд
   useEffect(() => {
-    if (user && user.phoneVerificationStatus === 'REQUIRED') {
+    if (user && (user as any).phoneVerificationStatus === 'REQUIRED') {
       const interval = setInterval(checkPhoneStatus, 5000);
       return () => clearInterval(interval);
     }
@@ -107,7 +107,7 @@ const ProfilePage: React.FC = () => {
       }
 
       // Отправляем запрос через API
-      const response = await phoneApi.requestPhone(telegramId, user.id, token);
+      const response = await phoneApi.requestPhone(telegramId.toString(), user.id, token);
       
       if (response.success) {
         showTelegramAlert('Запрос отправлен в Telegram Bot. Проверьте чат с ботом и нажмите кнопку "Отправить номер телефона".');
@@ -273,8 +273,8 @@ const ProfilePage: React.FC = () => {
             <div className="info-item">
               <span className="info-label">Телефон:</span>
               <span className="info-value">
-                {user.phone || 'не указан'}
-                {user.phoneVerificationStatus === 'REQUIRED' && (
+                {(user as any).phone || 'не указан'}
+                {(user as any).phoneVerificationStatus === 'REQUIRED' && (
                   <button 
                     className="request-contact-button"
                     onClick={handleRequestContact}
@@ -282,7 +282,7 @@ const ProfilePage: React.FC = () => {
                     Подтвердить номер
                   </button>
                 )}
-                {user.phoneVerificationStatus === 'VERIFIED' && user.phone && (
+                {(user as any).phoneVerificationStatus === 'VERIFIED' && (user as any).phone && (
                   <span className="verified-badge">✓ Подтвержден</span>
                 )}
               </span>

@@ -51,7 +51,7 @@ class ErrorBoundary extends Component<Props, State> {
               Перезагрузить страницу
             </button>
             
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {(window as any).process?.env?.NODE_ENV === 'development' && this.state.error && (
               <details className="error-details">
                 <summary>Детали ошибки (только для разработки)</summary>
                 <pre>{this.state.error.toString()}</pre>
