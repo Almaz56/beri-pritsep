@@ -3,13 +3,14 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 60px;
+  height: calc(60px + env(safe-area-inset-bottom));
   background: #ffffff;
   border-top: 1px solid #eaeaea;
   display: flex;
   align-items: center;
   justify-content: space-around;
   z-index: 1000;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .nav-item {
@@ -35,7 +36,7 @@
 .app-container {
   max-width: 480px;
   margin: 0 auto;
-  padding-bottom: 70px; /* space for navbar */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom)); /* space for navbar + safe area */
 }
 
 .page-container {

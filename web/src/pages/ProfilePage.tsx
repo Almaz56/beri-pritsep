@@ -32,6 +32,20 @@ const ProfilePage: React.FC = () => {
     }
   }, [user]);
 
+  const attemptTelegramAutoLogin = async (): Promise<boolean> => {
+    try {
+      const initData = getTelegramInitData();
+      if (!initData) return false;
+      const response = await authApi.telegramLogin(initData);
+      if (response.success && response.data) {
+        setAuthToken(response.data.token);
+        setUser(response.data.user);
+        return true;
+      }
+    } catch {}
+    return false;
+  };
+
   const checkAuth = async () => {
     let token = getAuthToken();
     
@@ -44,25 +58,25 @@ const ProfilePage: React.FC = () => {
         } else {
           // Token is invalid, remove it
           removeAuthToken();
+          // попробовать авто-логин через Telegram сразу
+          const ok = await attemptTelegramAutoLogin();
+          if (ok) {
+            setLoading(false);
+            return;
+          }
         }
       } catch (err) {
         console.error('Error checking auth:', err);
         removeAuthToken();
+        const ok = await attemptTelegramAutoLogin();
+        if (ok) {
+          setLoading(false);
+          return;
+        }
       }
     } else {
       // Попробуем авторизоваться автоматически через Telegram initData
-      try {
-        const initData = getTelegramInitData();
-        if (initData) {
-          const response = await authApi.telegramLogin(initData);
-          if (response.success && response.data) {
-            setAuthToken(response.data.token);
-            setUser(response.data.user);
-          }
-        }
-      } catch (e) {
-        // тихо игнорируем, покажем экран логина ниже
-      }
+      await attemptTelegramAutoLogin();
     }
     
     setLoading(false);
