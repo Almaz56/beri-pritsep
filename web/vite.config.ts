@@ -19,10 +19,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
   },
-  define: {
-    // Define environment variables for build
-    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'http://localhost:8080/api'),
-    'process.env': '{}',
-    global: 'globalThis'
-  },
+define: {
+  'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'https://api.beripritsep.ru'),
+  'process.env': '{}',
+  global: 'globalThis'
+},
 })

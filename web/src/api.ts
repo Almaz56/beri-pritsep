@@ -145,7 +145,7 @@ export const authApi = {
    * Authenticate with Telegram initData
    */
   async telegramLogin(initData: string): Promise<ApiResponse<{ user: User; token: string }>> {
-    const response = await fetch(`${API_BASE_URL}/auth/telegram`, {
+    const response = await fetch(`${API_BASE_URL}/api/auth/telegram`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ export const authApi = {
    */
   async devLogin(userId?: string): Promise<ApiResponse<{ user: User; token: string }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/dev`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/dev`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +187,7 @@ export const authApi = {
    * Get user profile
    */
   async getProfile(token: string): Promise<ApiResponse<User>> {
-    const response = await fetch(`${API_BASE_URL}/profile`, {
+    const response = await fetch(`${API_BASE_URL}/api/profile`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -204,8 +204,8 @@ export const trailersApi = {
    */
   async getTrailers(locationId?: string): Promise<ApiResponse<Trailer[]>> {
     const url = locationId 
-      ? `${API_BASE_URL}/trailers?location_id=${locationId}`
-      : `${API_BASE_URL}/trailers`;
+      ? `${API_BASE_URL}/api/trailers?location_id=${locationId}`
+      : `${API_BASE_URL}/api/trailers`;
     
     const response = await fetch(url);
     return response.json();
@@ -215,7 +215,7 @@ export const trailersApi = {
    * Get trailer by ID
    */
   async getTrailer(trailerId: string): Promise<ApiResponse<Trailer>> {
-    const response = await fetch(`${API_BASE_URL}/trailers/${trailerId}`);
+    const response = await fetch(`${API_BASE_URL}/api/trailers/${trailerId}`);
     return response.json();
   },
 };
@@ -227,7 +227,7 @@ export const quoteApi = {
    */
   async calculateQuote(request: QuoteRequest): Promise<ApiResponse<QuoteResponse>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/quote`, {
+      const response = await fetch(`${API_BASE_URL}/api/quote`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,7 +257,7 @@ export const bookingsApi = {
    */
   async createBooking(request: BookingRequest, token: string): Promise<ApiResponse<BookingResponse>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/bookings`, {
+      const response = await fetch(`${API_BASE_URL}/api/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -284,7 +284,7 @@ export const bookingsApi = {
    * Get user bookings
    */
   async getUserBookings(token: string): Promise<ApiResponse<Booking[]>> {
-    const response = await fetch(`${API_BASE_URL}/bookings`, {
+    const response = await fetch(`${API_BASE_URL}/api/bookings`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -368,7 +368,7 @@ export const phoneApi = {
    */
   async requestPhone(telegramId: string, userId: string, token: string): Promise<ApiResponse<{ message: string }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/phone/request`, {
+      const response = await fetch(`${API_BASE_URL}/api/phone/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -396,7 +396,7 @@ export const phoneApi = {
    */
   async getPhoneStatus(userId: string, token: string): Promise<ApiResponse<{ phone: string; phoneVerificationStatus: string; isVerified: boolean }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/phone/status/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/phone/status/${userId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -422,7 +422,7 @@ export const phoneApi = {
    */
   async getRequestStatus(telegramId: string, token: string): Promise<ApiResponse<{ hasRequest: boolean; request: any }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/phone/request-status/${telegramId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/phone/request-status/${telegramId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -451,7 +451,7 @@ export const documentsApi = {
    */
   async uploadDocument(formData: FormData, token: string): Promise<ApiResponse<{ documentId: string; filename: string; documentType: string; ocrPreview: any; verificationStatus: string }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -478,7 +478,7 @@ export const documentsApi = {
    */
   async getDocumentVerification(userId: string, token: string): Promise<ApiResponse<{ hasDocuments: boolean; status: string; documents: any; moderatorComment?: string; createdAt: string; updatedAt: string }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/verification/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/verification/${userId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -504,7 +504,7 @@ export const documentsApi = {
    */
   async deleteDocument(documentId: string, token: string): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -639,7 +639,7 @@ export const qrApi = {
    */
   async generateAllTrailerQRs(token: string): Promise<ApiResponse<Array<{ id: string; name: string; dataUrl: string; url: string }>>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/qr/trailers/all`, {
+      const response = await fetch(`${API_BASE_URL}/qr/api/trailers/all`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -665,7 +665,7 @@ export const qrApi = {
    */
   async generateLocationTrailerQRs(locationId: string, token: string): Promise<ApiResponse<{ locationId: string; locationName: string; trailers: Array<{ id: string; name: string; dataUrl: string; url: string }> }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/qr/location/${locationId}/trailers`, {
+      const response = await fetch(`${API_BASE_URL}/qr/location/${locationId}/api/trailers`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -7,7 +7,7 @@ import './TrailerPage.css';
 const TrailerPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  
+
   const [trailer, setTrailer] = useState<Trailer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,15 +20,6 @@ const TrailerPage: React.FC = () => {
     duration: 2,
     pickup: false
   });
-
-  // Safe state setter
-  const safeSetBookingData = useCallback((updater: (prev: typeof bookingData) => typeof bookingData) => {
-    try {
-      setBookingData(updater);
-    } catch (error) {
-      console.error('Error updating booking data:', error);
-    }
-  }, []);
   const [quote, setQuote] = useState<any>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
 
@@ -39,7 +30,7 @@ const TrailerPage: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    if (showBookingForm) {
+    if (showBookingForm && quote && quote.pricing) {
       setupTelegramMainButton('Забронировать', handleBooking, {
         color: '#4CAF50',
         textColor: '#ffffff'
@@ -51,24 +42,28 @@ const TrailerPage: React.FC = () => {
     return () => {
       hideTelegramMainButton();
     };
-  }, [showBookingForm, bookingData]);
+  }, [showBookingForm, quote]);
+
+  useEffect(() => {
+    if (bookingData.startDate && bookingData.startTime && bookingData.duration > 0) {
+      calculateQuote();
+    }
+  }, [bookingData.startDate, bookingData.startTime, bookingData.duration, bookingData.rentalType, bookingData.pickup]);
 
   const loadTrailer = async () => {
     if (!id) return;
-    
+
     try {
       setLoading(true);
       setError(null);
-      
       const response = await trailersApi.getTrailer(id);
-      
       if (response.success && response.data) {
         setTrailer(response.data);
       } else {
         setError(response.error || 'Прицеп не найден');
       }
-    } catch (err) {
-      console.error('Error loading trailer:', err);
+    } catch (error) {
+      console.error('Error loading trailer:', error);
       setError('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -77,66 +72,43 @@ const TrailerPage: React.FC = () => {
 
   const calculateQuote = useCallback(async () => {
     if (!trailer || !bookingData.startDate || !bookingData.startTime || bookingData.duration <= 0) {
-      console.log('Missing data for quote calculation:', { trailer: !!trailer, startDate: bookingData.startDate, startTime: bookingData.startTime, duration: bookingData.duration });
       return;
     }
 
     try {
       setQuoteLoading(true);
-      
-      const startDateTime = new Date(`${bookingData.startDate}T${bookingData.startTime}`);
-      const endDateTime = new Date(startDateTime);
+      const startTime = new Date(`${bookingData.startDate}T${bookingData.startTime}`);
+      const endTime = new Date(startTime);
       
       if (bookingData.rentalType === 'HOURLY') {
-        endDateTime.setHours(endDateTime.getHours() + bookingData.duration);
+        endTime.setHours(endTime.getHours() + bookingData.duration);
       } else {
-        endDateTime.setDate(endDateTime.getDate() + bookingData.duration);
+        endTime.setDate(endTime.getDate() + bookingData.duration);
       }
 
       const request: QuoteRequest = {
         trailerId: trailer.id,
-        startTime: startDateTime.toISOString(),
-        endTime: endDateTime.toISOString(),
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
         rentalType: bookingData.rentalType,
         additionalServices: {
           pickup: bookingData.pickup
         }
       };
 
-      console.log('Calculating quote with request:', request);
-
       const response = await quoteApi.calculateQuote(request);
-      
       if (response.success && response.data) {
-        console.log('Full response data:', response.data);
-        console.log('Pricing structure:', response.data.pricing);
-        
-        // Validate response structure
-        if (response.data.pricing && response.data.pricing.breakdown) {
-          setQuote(response.data);
-          console.log('Quote calculated successfully:', response.data);
-        } else {
-          console.error('Invalid quote response structure:', response.data);
-          console.error('Expected pricing.breakdown, got:', response.data.pricing);
-          showTelegramAlert('Некорректный ответ от сервера');
-        }
+        setQuote(response.data);
       } else {
-        console.error('Quote calculation failed:', response.error);
         showTelegramAlert(response.error || 'Ошибка расчета стоимости');
       }
-    } catch (err) {
-      console.error('Error calculating quote:', err);
+    } catch (error) {
+      console.error('Error calculating quote:', error);
       showTelegramAlert('Ошибка расчета стоимости');
     } finally {
       setQuoteLoading(false);
     }
   }, [trailer, bookingData.startDate, bookingData.startTime, bookingData.duration, bookingData.rentalType, bookingData.pickup]);
-
-  useEffect(() => {
-    if (bookingData.startDate && bookingData.startTime && bookingData.duration > 0) {
-      calculateQuote();
-    }
-  }, [calculateQuote]);
 
   const handleBooking = useCallback(() => {
     try {
@@ -144,13 +116,10 @@ const TrailerPage: React.FC = () => {
         showTelegramAlert('Сначала рассчитайте стоимость');
         return;
       }
-      
       if (!trailer) {
         showTelegramAlert('Ошибка: прицеп не найден');
         return;
       }
-      
-      // Navigate to booking confirmation or payment
       navigate('/booking', { 
         state: { 
           trailer, 
@@ -164,13 +133,11 @@ const TrailerPage: React.FC = () => {
     }
   }, [quote, trailer, bookingData, navigate]);
 
-  const formatDimensions = (dimensions: Trailer['dimensions']) => {
-    return `${dimensions.length / 1000}м × ${dimensions.width / 1000}м × ${dimensions.height / 1000}м`;
-  };
+  const formatDimensions = (dimensions: any) => 
+    `${dimensions.length/1000}м × ${dimensions.width/1000}м × ${dimensions.height/1000}м`;
 
-  const formatWeight = (weight: number) => {
-    return weight >= 1000 ? `${weight / 1000}т` : `${weight}кг`;
-  };
+  const formatWeight = (weight: number) => 
+    weight >= 1000 ? `${weight/1000}т` : `${weight}кг`;
 
   const nextPhoto = () => {
     if (trailer && currentPhotoIndex < trailer.photos.length - 1) {
@@ -211,25 +178,24 @@ const TrailerPage: React.FC = () => {
 
   return (
     <div className="trailer-page">
-      {/* Photo Gallery */}
       <div className="photo-gallery">
         <div className="main-photo">
-          <img
-            src={trailer.photos[currentPhotoIndex]}
+          <img 
+            src={trailer.photos[currentPhotoIndex]} 
             alt={trailer.name}
             loading="lazy"
           />
           {trailer.photos.length > 1 && (
             <>
               <button 
-                className="photo-nav prev"
+                className="photo-nav prev" 
                 onClick={prevPhoto}
                 disabled={currentPhotoIndex === 0}
               >
                 ‹
               </button>
               <button 
-                className="photo-nav next"
+                className="photo-nav next" 
                 onClick={nextPhoto}
                 disabled={currentPhotoIndex === trailer.photos.length - 1}
               >
@@ -238,7 +204,6 @@ const TrailerPage: React.FC = () => {
             </>
           )}
         </div>
-        
         {trailer.photos.length > 1 && (
           <div className="photo-thumbnails">
             {trailer.photos.map((photo, index) => (
@@ -255,12 +220,10 @@ const TrailerPage: React.FC = () => {
         )}
       </div>
 
-      {/* Trailer Info */}
       <div className="trailer-info">
         <h1 className="trailer-name">{trailer.name}</h1>
         <p className="trailer-description">{trailer.description}</p>
 
-        {/* Specifications */}
         <div className="specifications">
           <h3>Характеристики</h3>
           <div className="specs-grid">
@@ -274,9 +237,7 @@ const TrailerPage: React.FC = () => {
             </div>
             <div className="spec-item">
               <span className="spec-label">Тент:</span>
-              <span className="spec-value">
-                {trailer.hasTent ? '✅ Есть' : '❌ Нет'}
-              </span>
+              <span className="spec-value">{trailer.hasTent ? '✅ Есть' : '❌ Нет'}</span>
             </div>
             <div className="spec-item">
               <span className="spec-label">Оси:</span>
@@ -293,7 +254,6 @@ const TrailerPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Pricing */}
         <div className="pricing">
           <h3>Цены</h3>
           <div className="pricing-grid">
@@ -320,7 +280,6 @@ const TrailerPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Location */}
         {trailer.location && (
           <div className="location">
             <h3>Локация</h3>
@@ -333,38 +292,15 @@ const TrailerPage: React.FC = () => {
           </div>
         )}
 
-        {/* Booking Form */}
         <div className="booking-section">
           <h3>Бронирование</h3>
-          
-          {!showBookingForm ? (
-            <div className="booking-buttons">
-              <button 
-                className="booking-button hourly"
-                onClick={() => setShowBookingForm(true)}
-              >
-                Почасовая аренда
-              </button>
-              <button 
-                className="booking-button daily"
-                onClick={() => {
-                  safeSetBookingData(prev => ({ ...prev, rentalType: 'DAILY' }));
-                  setShowBookingForm(true);
-                }}
-              >
-                Посуточная аренда
-              </button>
-            </div>
-          ) : (
+          {showBookingForm ? (
             <div className="booking-form">
               <div className="form-group">
                 <label>Тип аренды:</label>
-                <select
-                  value={bookingData.rentalType}
-                  onChange={(e) => safeSetBookingData(prev => ({ 
-                    ...prev, 
-                    rentalType: e.target.value as 'HOURLY' | 'DAILY' 
-                  }))}
+                <select 
+                  value={bookingData.rentalType} 
+                  onChange={(e) => setBookingData(prev => ({ ...prev, rentalType: e.target.value as 'HOURLY' | 'DAILY' }))}
                 >
                   <option value="HOURLY">Почасовая</option>
                   <option value="DAILY">Посуточная</option>
@@ -373,24 +309,20 @@ const TrailerPage: React.FC = () => {
 
               <div className="form-group">
                 <label>Дата начала:</label>
-                <input
-                  type="date"
+                <input 
+                  type="date" 
                   value={bookingData.startDate}
-                  onChange={(e) => {
-                    safeSetBookingData(prev => ({ ...prev, startDate: e.target.value }));
-                  }}
+                  onChange={(e) => setBookingData(prev => ({ ...prev, startDate: e.target.value }))}
                   min={new Date().toISOString().split('T')[0]}
                 />
               </div>
 
               <div className="form-group">
                 <label>Время начала:</label>
-                <input
-                  type="time"
+                <input 
+                  type="time" 
                   value={bookingData.startTime}
-                  onChange={(e) => {
-                    safeSetBookingData(prev => ({ ...prev, startTime: e.target.value }));
-                  }}
+                  onChange={(e) => setBookingData(prev => ({ ...prev, startTime: e.target.value }))}
                 />
               </div>
 
@@ -398,23 +330,23 @@ const TrailerPage: React.FC = () => {
                 <label>
                   {bookingData.rentalType === 'HOURLY' ? 'Продолжительность (часы):' : 'Продолжительность (дни):'}
                 </label>
-                <input
-                  type="number"
+                <input 
+                  type="number" 
                   min={bookingData.rentalType === 'HOURLY' ? 2 : 1}
                   value={bookingData.duration}
                   onChange={(e) => {
-                    const value = parseInt(e.target.value) || (bookingData.rentalType === 'HOURLY' ? 2 : 1);
-                    safeSetBookingData(prev => ({ ...prev, duration: value }));
+                    const duration = parseInt(e.target.value) || (bookingData.rentalType === 'HOURLY' ? 2 : 1);
+                    setBookingData(prev => ({ ...prev, duration }));
                   }}
                 />
               </div>
 
               <div className="form-group checkbox">
                 <label>
-                  <input
-                    type="checkbox"
+                  <input 
+                    type="checkbox" 
                     checked={bookingData.pickup}
-                    onChange={(e) => safeSetBookingData(prev => ({ ...prev, pickup: e.target.checked }))}
+                    onChange={(e) => setBookingData(prev => ({ ...prev, pickup: e.target.checked }))}
                   />
                   Забор прицепа (+{trailer.pricing.pickupPrice}₽)
                 </label>
@@ -454,20 +386,31 @@ const TrailerPage: React.FC = () => {
               )}
 
               <div className="form-actions">
-                <button 
+                <button
                   className="cancel-button"
                   onClick={() => setShowBookingForm(false)}
                 >
                   Отмена
                 </button>
-                <button 
-                  className="book-button"
-                  onClick={handleBooking}
-                  disabled={!quote || !quote.pricing || quoteLoading}
-                >
-                  Забронировать
-                </button>
               </div>
+            </div>
+          ) : (
+            <div className="booking-buttons">
+              <button 
+                className="booking-button hourly"
+                onClick={() => setShowBookingForm(true)}
+              >
+                Почасовая аренда
+              </button>
+              <button 
+                className="booking-button daily"
+                onClick={() => {
+                  setBookingData(prev => ({ ...prev, rentalType: 'DAILY' }));
+                  setShowBookingForm(true);
+                }}
+              >
+                Посуточная аренда
+              </button>
             </div>
           )}
         </div>

@@ -106,9 +106,13 @@ const BookingPage: React.FC = () => {
         <div className="error-container">
           <h2>Ошибка</h2>
           <p>Данные бронирования не найдены</p>
-          <button onClick={() => navigate('/')} className="back-button">
-            На главную
-          </button>
+        <button
+          className="cancel-button"
+          onClick={() => navigate(-1)}
+          disabled={loading}
+        >
+          Отмена
+        </button>
         </div>
       </div>
     );
@@ -253,20 +257,12 @@ const BookingPage: React.FC = () => {
 
         {/* Actions */}
         <div className="booking-actions">
-          <button 
+          <button
             className="cancel-button"
-            onClick={handleCancel}
+            onClick={() => navigate(-1)}
             disabled={loading}
           >
             Отмена
-          </button>
-          
-          <button 
-            className="confirm-button"
-            onClick={handleConfirmBooking}
-            disabled={loading}
-          >
-            {loading ? 'Создание...' : 'Подтвердить бронирование'}
           </button>
         </div>
       </div>
