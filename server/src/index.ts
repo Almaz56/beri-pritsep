@@ -113,7 +113,12 @@ app.post('/api/auth/telegram', async (req: Request, res: Response) => {
     }
 
     // Verify Telegram initData
-    const userData = await verifyInitData(initData);
+    let userData = await verifyInitData(initData);
+    if (!userData && ALLOW_DEV_AUTH) {
+      console.warn('verifyInitData failed; falling back to dev verification');
+      const { verifyInitDataDev } = await import('./verifyInitData');
+      userData = verifyInitDataDev(initData) as any;
+    }
     
     if (!userData) {
       return res.status(401).json({
