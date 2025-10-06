@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { documentsApi } from '../api';
+import { documentsApi, getAuthToken, authApi } from '../api';
 import { showTelegramAlert, setupTelegramMainButton, hideTelegramMainButton } from '../telegram';
 import './DocumentUploadPage.css';
 
@@ -14,15 +14,37 @@ const DocumentUploadPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ocrPreview, setOcrPreview] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('authToken'));
+  const [token, setToken] = useState<string | null>(getAuthToken());
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    // refresh token from unified storage in case it was set after auth
+    const currentToken = getAuthToken();
+    if (currentToken !== token) {
+      setToken(currentToken);
+    }
+
     if (!token) {
       showTelegramAlert('Вы не авторизованы. Пожалуйста, войдите в аккаунт.');
       navigate('/profile');
       return;
     }
+
+    // Fetch current user profile to get real userId
+    (async () => {
+      try {
+        const profile = await authApi.getProfile(token);
+        if (profile.success && profile.data) {
+          setUserId(profile.data.id);
+        } else {
+          showTelegramAlert('Не удалось получить профиль пользователя. Пожалуйста, войдите заново.');
+          navigate('/profile');
+        }
+      } catch {
+        showTelegramAlert('Ошибка при получении профиля. Пожалуйста, войдите заново.');
+        navigate('/profile');
+      }
+    })();
 
     // Get user ID from token (in real app, would decode JWT)
     // For now, we'll use a mock user ID

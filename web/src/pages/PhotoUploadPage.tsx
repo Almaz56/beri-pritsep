@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { showTelegramAlert } from '../telegram';
+import { getAuthToken } from '../api';
 import './PhotoUploadPage.css';
 
 const PhotoUploadPage: React.FC = () => {
@@ -39,13 +40,14 @@ const PhotoUploadPage: React.FC = () => {
       formData.append('type', type);
       formData.append('sides', 'FRONT,REAR,LEFT,RIGHT');
 
-      const token = localStorage.getItem('authToken');
+      const token = getAuthToken();
       if (!token) {
         showTelegramAlert('Ошибка: необходимо авторизоваться');
         return;
       }
 
-      const response = await fetch('http://localhost:8080/api/photos/upload', {
+      const apiBase = (window as any).VITE_API_URL || (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${apiBase}/photos/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
