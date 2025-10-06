@@ -103,7 +103,11 @@ app.get('/api/health', (req, res) => {
 // Auth endpoints
 app.post('/api/auth/telegram', async (req: Request, res: Response) => {
   try {
-    const { initData } = req.body;
+    let { initData } = req.body as any;
+    if (!initData) {
+      const headerInit = req.header('x-telegram-init-data');
+      if (headerInit) initData = headerInit;
+    }
 
     if (!initData) {
       return res.status(400).json({
