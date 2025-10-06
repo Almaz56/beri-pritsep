@@ -35,28 +35,40 @@ const ProfilePage: React.FC = () => {
   const attemptTelegramAutoLogin = async (): Promise<boolean> => {
     try {
       const initData = getTelegramInitData();
-      if (!initData) return false;
+      if (!initData) {
+        console.log('No Telegram initData available');
+        return false;
+      }
+      console.log('Attempting auto-login with initData');
       const response = await authApi.telegramLogin(initData);
       if (response.success && response.data) {
+        console.log('Auto-login successful');
         setAuthToken(response.data.token);
         setUser(response.data.user);
         return true;
+      } else {
+        console.log('Auto-login failed:', response.error);
       }
-    } catch {}
+    } catch (error) {
+      console.log('Auto-login error:', error);
+    }
     return false;
   };
 
   const checkAuth = async () => {
     let token = getAuthToken();
+    console.log('Checking auth, token exists:', !!token);
     
     if (token) {
       try {
         const response = await authApi.getProfile(token);
         
         if (response.success && response.data) {
+          console.log('Profile loaded successfully');
           setUser(response.data);
         } else {
           // Token is invalid, remove it
+          console.log('Token invalid, removing and trying auto-login');
           removeAuthToken();
           // попробовать авто-логин через Telegram сразу
           const ok = await attemptTelegramAutoLogin();
@@ -76,6 +88,7 @@ const ProfilePage: React.FC = () => {
       }
     } else {
       // Попробуем авторизоваться автоматически через Telegram initData
+      console.log('No token, attempting auto-login');
       await attemptTelegramAutoLogin();
     }
     
