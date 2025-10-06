@@ -16,6 +16,14 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+  // Fallback: allow X-Telegram-Init-Data when no Bearer token (TWA auto-login)
+  const telegramInitData = req.header('x-telegram-init-data');
+  if (!token && telegramInitData) {
+    // accept request but attach a synthetic user from verified initData at auth endpoint layer
+    // here we just skip to handler; handlers that require req.user should first ensure JWT flow used
+    return next();
+  }
+
   if (!token) {
     return res.status(401).json({ success: false, error: 'Access token required' });
   }

@@ -186,12 +186,12 @@ export const authApi = {
   /**
    * Get user profile
    */
-  async getProfile(token: string): Promise<ApiResponse<User>> {
-    const response = await fetch(`${API_BASE_URL}/api/profile`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+  async getProfile(token: string | null): Promise<ApiResponse<User>> {
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const initData = (window as any)?.Telegram?.WebApp?.initData;
+    if (!token && initData) headers['X-Telegram-Init-Data'] = initData;
+    const response = await fetch(`${API_BASE_URL}/api/profile`, { headers });
 
     return response.json();
   },
@@ -283,12 +283,12 @@ export const bookingsApi = {
   /**
    * Get user bookings
    */
-  async getUserBookings(token: string): Promise<ApiResponse<Booking[]>> {
-    const response = await fetch(`${API_BASE_URL}/api/bookings`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+  async getUserBookings(token: string | null): Promise<ApiResponse<Booking[]>> {
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const initData = (window as any)?.Telegram?.WebApp?.initData;
+    if (!token && initData) headers['X-Telegram-Init-Data'] = initData;
+    const response = await fetch(`${API_BASE_URL}/api/bookings`, { headers });
 
     return response.json();
   },
