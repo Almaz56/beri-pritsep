@@ -10,11 +10,13 @@ import PhotoUploadPage from './pages/PhotoUploadPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
 import TestPage from './pages/TestPage';
 import './styles/App.css';
+import NavBar from './components/NavBar';
+import './styles/navbar.css';
 
 function App() {
   return (
     <ErrorBoundary>
-      <div className="app">
+      <div className="app app-container">
         <Routes>
           <Route path="/" element={<LocationPage />} />
           <Route path="/trailer/:id" element={
@@ -45,6 +47,7 @@ function App() {
                       } />
                       <Route path="/test" element={<TestPage />} />
         </Routes>
+        <NavBar />
       </div>
     </ErrorBoundary>
   );
