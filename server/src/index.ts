@@ -426,42 +426,129 @@ app.post('/api/bookings', authenticateToken, (req: AuthRequest, res: Response) =
   }
 });
 
-app.get('/api/bookings', authenticateToken, (req: AuthRequest, res: Response) => {
-  const userId = req.user?.id!;
-  const userBookings = Array.from(bookings.values())
-    .filter(booking => booking.userId === userId)
-    .map(booking => {
-      const trailer = trailers.get(booking.trailerId);
-      return {
-        ...booking,
-        trailer
-      };
-    });
+app.get('/api/bookings', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    let userId = req.user?.id;
+    
+    // If no JWT user but we have X-Telegram-Init-Data, try to authenticate
+    if (!userId) {
+      const initData = req.header('x-telegram-init-data');
+      if (initData) {
+        const userData = await verifyInitData(initData);
+        if (userData) {
+          // Find or create user
+          let user = users.get(userData.id.toString());
+          if (!user) {
+            user = {
+              id: userData.id.toString(),
+              telegramId: userData.id,
+              firstName: userData.first_name,
+              lastName: userData.last_name || '',
+              username: userData.username || '',
+              phoneNumber: '',
+              phoneVerificationStatus: 'REQUIRED',
+              verificationStatus: 'PENDING',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+            users.set(user.id, user);
+          }
+          userId = user.id;
+        }
+      }
+    }
 
-  res.json({
-    success: true,
-    data: userBookings,
-    message: 'User bookings retrieved successfully'
-  });
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Access token required'
+      });
+    }
+
+    const userBookings = Array.from(bookings.values())
+      .filter(booking => booking.userId === userId)
+      .map(booking => {
+        const trailer = trailers.get(booking.trailerId);
+        return {
+          ...booking,
+          trailer
+        };
+      });
+
+    res.json({
+      success: true,
+      data: userBookings,
+      message: 'User bookings retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Bookings error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
 });
 
 // User profile endpoint
-app.get('/api/profile', authenticateToken, (req: AuthRequest, res: Response) => {
-    const userId = req.user?.id!;
-    const user = users.get(userId!);
+app.get('/api/profile', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    let userId = req.user?.id;
+    
+    // If no JWT user but we have X-Telegram-Init-Data, try to authenticate
+    if (!userId) {
+      const initData = req.header('x-telegram-init-data');
+      if (initData) {
+        const userData = await verifyInitData(initData);
+        if (userData) {
+          // Find or create user
+          let user = users.get(userData.id.toString());
+          if (!user) {
+            user = {
+              id: userData.id.toString(),
+              telegramId: userData.id,
+              firstName: userData.first_name,
+              lastName: userData.last_name || '',
+              username: userData.username || '',
+              phoneNumber: '',
+              phoneVerificationStatus: 'REQUIRED',
+              verificationStatus: 'PENDING',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+            users.set(user.id, user);
+          }
+          userId = user.id;
+        }
+      }
+    }
 
-  if (!user) {
-    return res.status(404).json({
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Access token required'
+      });
+    }
+
+    const user = users.get(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user,
+      message: 'Profile retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({
       success: false,
-      error: 'User not found'
+      error: 'Internal server error'
     });
   }
-
-  res.json({
-    success: true,
-    data: user,
-    message: 'Profile retrieved successfully'
-  });
 });
 
 // Error handling middleware
