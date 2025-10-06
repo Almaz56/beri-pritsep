@@ -33,7 +33,7 @@ const ProfilePage: React.FC = () => {
   }, [user]);
 
   const checkAuth = async () => {
-    const token = getAuthToken();
+    let token = getAuthToken();
     
     if (token) {
       try {
@@ -48,6 +48,20 @@ const ProfilePage: React.FC = () => {
       } catch (err) {
         console.error('Error checking auth:', err);
         removeAuthToken();
+      }
+    } else {
+      // Попробуем авторизоваться автоматически через Telegram initData
+      try {
+        const initData = getTelegramInitData();
+        if (initData) {
+          const response = await authApi.telegramLogin(initData);
+          if (response.success && response.data) {
+            setAuthToken(response.data.token);
+            setUser(response.data.user);
+          }
+        }
+      } catch (e) {
+        // тихо игнорируем, покажем экран логина ниже
       }
     }
     
@@ -82,6 +96,16 @@ const ProfilePage: React.FC = () => {
         setAuthToken(response.data.token);
         setUser(response.data.user);
         showTelegramAlert('Авторизация успешна!');
+        // Автоматический запрос номера, если требуется
+        try {
+          if ((response.data.user as any).phoneVerificationStatus === 'REQUIRED') {
+            const tgUser = getTelegramUserUnsafe();
+            if (tgUser?.id) {
+              const token = getAuthToken();
+              await phoneApi.requestPhone(String(tgUser.id), response.data.user.id, token!);
+            }
+          }
+        } catch {}
       } else {
         setError(response.error || 'Ошибка авторизации');
       }
