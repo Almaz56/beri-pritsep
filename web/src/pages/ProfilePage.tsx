@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authApi, phoneApi, documentsApi, type User } from '../api';
 import { getTelegramInitData, getTelegramUserUnsafe, requestTelegramContact, showTelegramAlert } from '../telegram';
 import { getAuthToken, setAuthToken, removeAuthToken } from '../api';
 import './ProfilePage.css';
 
 const ProfilePage: React.FC = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authenticating, setAuthenticating] = useState(false);
@@ -327,7 +329,7 @@ const ProfilePage: React.FC = () => {
               
               <button 
                 className="upload-docs-button"
-                onClick={() => window.location.href = '/documents/upload'}
+                onClick={() => navigate('/documents/upload')}
               >
                 {documentStatus && documentStatus.hasDocuments ? 'Обновить документы' : 'Загрузить документы'}
               </button>
@@ -362,7 +364,7 @@ const ProfilePage: React.FC = () => {
           <div className="profile-actions">
             <button 
               className="bookings-button"
-              onClick={() => window.location.href = '/bookings'}
+              onClick={() => navigate('/bookings')}
             >
               Мои бронирования
             </button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { bookingsApi, type Booking } from '../api';
-import { getAuthToken } from '../api';
+import { bookingsApi, type Booking, authApi, setAuthToken, getAuthToken } from '../api';
+import { getTelegramInitData } from '../telegram';
 import { showTelegramAlert } from '../telegram';
 import './BookingsPage.css';
 
@@ -18,7 +18,18 @@ const BookingsPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const token = getAuthToken();
+      let token = getAuthToken();
+      if (!token) {
+        // Попробуем мгновенную авторизацию через Telegram initData
+        const initData = getTelegramInitData();
+        if (initData) {
+          const auth = await authApi.telegramLogin(initData);
+          if (auth.success && auth.data) {
+            setAuthToken(auth.data.token);
+            token = auth.data.token;
+          }
+        }
+      }
       if (!token) {
         setError('Необходимо авторизоваться');
         return;
