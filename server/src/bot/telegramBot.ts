@@ -11,15 +11,26 @@ interface PhoneRequest {
 class TelegramBotService {
   private bot: TelegramBot | null = null;
   private phoneRequests = new Map<string, PhoneRequest>();
-  private botToken: string;
+  private botToken: string = '';
+  private initialized: boolean = false;
 
   constructor() {
+    // Инициализация будет выполнена позже через initialize()
+  }
+
+  /**
+   * Инициализация бота (вызывается после загрузки переменных окружения)
+   */
+  initialize(): void {
+    if (this.initialized) return;
+    
     this.botToken = process.env['BOT_TOKEN'] || '';
     if (!this.botToken) {
       logger.warn('BOT_TOKEN not provided. Telegram Bot will not be initialized.');
       return;
     }
     this.initializeBot();
+    this.initialized = true;
   }
 
   private initializeBot(): void {

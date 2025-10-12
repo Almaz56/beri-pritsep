@@ -35,14 +35,21 @@ import {
   photoChecks,
   initializeData 
 } from './data';
+import { telegramBotService } from './bot/telegramBot';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: '.env' });
 
 const app = express();
 const PORT = process.env['PORT'] || 8080;
 const JWT_SECRET = process.env['JWT_SECRET'] || 'dev-secret-key';
 const ALLOW_DEV_AUTH = process.env['ALLOW_DEV_AUTH'] === 'true';
+
+// Debug environment variables
+console.log('🔧 Environment variables loaded:');
+console.log('  BOT_TOKEN:', process.env['BOT_TOKEN'] ? '✅ Set' : '❌ Not set');
+console.log('  ALLOW_DEV_AUTH:', ALLOW_DEV_AUTH);
+console.log('  NODE_ENV:', process.env['NODE_ENV']);
 
 // Security middleware
 app.use(helmet());
@@ -83,6 +90,9 @@ app.use('/api/photo-comparison', photoComparisonRoutes);
 
 // Initialize in-memory data
 initializeData();
+
+// Initialize Telegram Bot
+telegramBotService.initialize();
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
