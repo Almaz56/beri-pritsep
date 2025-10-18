@@ -1,5 +1,21 @@
 // API client for Admin Panel
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 
+  (window.location.hostname === 'admin.beripritsep.ru' 
+    ? 'https://api.beripritsep.ru/api' 
+    : 'http://localhost:8080/api');
+
+// Helper function to get auth headers
+const getAuthHeaders = (token?: string) => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -9,50 +25,38 @@ export interface ApiResponse<T = any> {
 }
 
 export interface Trailer {
-  id: string;
+  id: number;
   name: string;
   description: string;
   photos: string[];
-  dimensions: {
-    length: number;
-    width: number;
-    height: number;
-  };
   capacity: number;
-  hasTent: boolean;
-  axles: number;
-  brakeType: string;
-  weight: number;
-  locationId: string;
+  dailyRate: number;
+  minRentalHours: number;
+  minRentalPrice: number;
+  extraHourPrice: number;
+  pickupPrice: number;
+  depositAmount: number;
+  locationId?: number;
   location?: Location;
-  pricing: {
-    minHours: number;
-    minCost: number;
-    hourPrice: number;
-    dayPrice: number;
-    deposit: number;
-    pickupPrice: number;
-  };
+  features: string[];
   status: 'AVAILABLE' | 'RENTED' | 'MAINTENANCE';
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Location {
-  id: string;
+  id: number;
   name: string;
   address: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  workingHours: {
-    open: string;
-    close: string;
-  };
-  phone: string;
-  description: string;
-  qrCode: string;
+  photos: string[];
+  latitude?: number;
+  longitude?: number;
+  city: string;
+  region: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface User {
@@ -118,6 +122,33 @@ export interface PhotoComparison {
   updatedAt: string;
 }
 
+export interface SupportChat {
+  id: number;
+  userId: number;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+  user: User;
+  messages: SupportMessage[];
+  isUserTyping?: boolean;
+}
+
+export interface SupportMessage {
+  id: number;
+  chatId: number;
+  senderId?: number;
+  senderType: 'USER' | 'ADMIN';
+  content: string;
+  attachments: string[];
+  isRead: boolean;
+  createdAt: string;
+  admin?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
+}
+
 // Trailers API
 export const trailersApi = {
   async getTrailers(): Promise<ApiResponse<Trailer[]>> {
@@ -167,36 +198,40 @@ export const locationsApi = {
     return response.json();
   },
 
-  async getLocation(locationId: string): Promise<ApiResponse<Location>> {
+  async getAdminLocations(token: string): Promise<ApiResponse<Location[]>> {
+    const response = await fetch(`${API_BASE_URL}/admin/locations`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async getLocation(locationId: number): Promise<ApiResponse<Location>> {
     const response = await fetch(`${API_BASE_URL}/locations/${locationId}`);
     return response.json();
   },
 
-  async createLocation(location: Partial<Location>): Promise<ApiResponse<Location>> {
-    const response = await fetch(`${API_BASE_URL}/locations`, {
+  async createLocation(token: string, location: Partial<Location>): Promise<ApiResponse<Location>> {
+    const response = await fetch(`${API_BASE_URL}/admin/locations`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(token),
       body: JSON.stringify(location),
     });
     return response.json();
   },
 
-  async updateLocation(locationId: string, updates: Partial<Location>): Promise<ApiResponse<Location>> {
-    const response = await fetch(`${API_BASE_URL}/locations/${locationId}`, {
+  async updateLocation(token: string, locationId: number, updates: Partial<Location>): Promise<ApiResponse<Location>> {
+    const response = await fetch(`${API_BASE_URL}/admin/locations/${locationId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(token),
       body: JSON.stringify(updates),
     });
     return response.json();
   },
 
-  async deleteLocation(locationId: string): Promise<ApiResponse<any>> {
-    const response = await fetch(`${API_BASE_URL}/locations/${locationId}`, {
+  async deleteLocation(token: string, locationId: number): Promise<ApiResponse<any>> {
+    const response = await fetch(`${API_BASE_URL}/admin/locations/${locationId}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(token),
     });
     return response.json();
   },
@@ -287,6 +322,103 @@ export const photoComparisonApi = {
   },
 };
 
+// Admin API
+export const adminApi = {
+  async getStats(token: string): Promise<ApiResponse<any>> {
+    const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async getUsers(token: string): Promise<ApiResponse<User[]>> {
+    const response = await fetch(`${API_BASE_URL}/admin/users`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async getBookings(token: string): Promise<ApiResponse<Booking[]>> {
+    const response = await fetch(`${API_BASE_URL}/admin/bookings`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async getPayments(token: string): Promise<ApiResponse<Payment[]>> {
+    const response = await fetch(`${API_BASE_URL}/admin/payments`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  // Trailer Management
+  async getTrailers(token: string): Promise<ApiResponse<Trailer[]>> {
+    const response = await fetch(`${API_BASE_URL}/admin/trailers`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async getTrailer(token: string, id: number): Promise<ApiResponse<Trailer>> {
+    const response = await fetch(`${API_BASE_URL}/admin/trailers/${id}`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async createTrailer(token: string, trailerData: Partial<Trailer>): Promise<ApiResponse<Trailer>> {
+    const response = await fetch(`${API_BASE_URL}/admin/trailers`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(trailerData)
+    });
+    return response.json();
+  },
+
+  async updateTrailer(token: string, id: number, trailerData: Partial<Trailer>): Promise<ApiResponse<Trailer>> {
+    const response = await fetch(`${API_BASE_URL}/admin/trailers/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(trailerData)
+    });
+    return response.json();
+  },
+
+  async deleteTrailer(token: string, id: number): Promise<ApiResponse<void>> {
+    const response = await fetch(`${API_BASE_URL}/admin/trailers/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async uploadTrailerPhotos(token: string, trailerId: number, photos: File[]): Promise<ApiResponse<{trailer: Trailer, uploadedPhotos: string[]}>> {
+    const formData = new FormData();
+    photos.forEach(photo => {
+      formData.append('photos', photo);
+    });
+
+    const response = await fetch(`${API_BASE_URL}/admin/trailers/${trailerId}/photos`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+    return response.json();
+  },
+
+  async updateTrailerPhotos(token: string, trailerId: number, photos: string[]): Promise<ApiResponse<Trailer>> {
+    const response = await fetch(`${API_BASE_URL}/admin/trailers/${trailerId}/photos`, {
+      method: 'PUT',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify({ photos })
+    });
+    return response.json();
+  },
+};
+
 // QR Code API
 export const qrApi = {
   async generateLocationQR(locationId: string): Promise<ApiResponse<{ qrCode: string; url: string }>> {
@@ -296,6 +428,52 @@ export const qrApi = {
 
   async generateTrailerQR(trailerId: string): Promise<ApiResponse<{ qrCode: string; url: string }>> {
     const response = await fetch(`${API_BASE_URL}/qr/trailer/${trailerId}`);
+    return response.json();
+  },
+};
+
+// Support Chat API
+export const supportApi = {
+  async getSupportChats(token: string): Promise<ApiResponse<SupportChat[]>> {
+    const response = await fetch(`${API_BASE_URL}/admin/support/chats`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+
+  async getSupportChat(token: string, chatId: number): Promise<ApiResponse<SupportChat>> {
+    const response = await fetch(`${API_BASE_URL}/admin/support/chats/${chatId}`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+
+  async sendSupportMessage(token: string, chatId: number, content: string, attachments?: string[]): Promise<ApiResponse<SupportMessage>> {
+    const response = await fetch(`${API_BASE_URL}/admin/support/chats/${chatId}/messages`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify({ content, attachments })
+    });
+    return response.json();
+  },
+
+  async markMessagesAsRead(token: string, chatId: number): Promise<ApiResponse<void>> {
+    const response = await fetch(`${API_BASE_URL}/admin/support/chats/${chatId}/read`, {
+      method: 'PUT',
+      headers: getAuthHeaders(token)
+    });
+    return response.json();
+  },
+
+  async getSupportStats(token: string): Promise<ApiResponse<{
+    totalChats: number;
+    unreadMessages: number;
+  }>> {
+    const response = await fetch(`${API_BASE_URL}/admin/support/stats`, {
+      headers: getAuthHeaders(token)
+    });
     return response.json();
   },
 };

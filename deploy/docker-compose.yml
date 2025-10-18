@@ -67,19 +67,21 @@ services:
     networks:
       - beripritsep-network
 
-  # PostgreSQL Database (for future use)
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: beripritsep-postgres
-  #   restart: unless-stopped
-  #   environment:
-  #     POSTGRES_DB: beripritsep
-  #     POSTGRES_USER: beripritsep
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   networks:
-  #     - beripritsep-network
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: beripritsep-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: beripritsep
+      POSTGRES_USER: beripritsep
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beripritsep123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - beripritsep-network
+    ports:
+      - "5432:5432"
 
   # Redis Cache (for future use)
   # redis:
@@ -94,7 +96,7 @@ services:
 volumes:
   uploads:
   logs:
-  # postgres_data:
+  postgres_data:
   # redis_data:
 
 networks:

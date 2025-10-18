@@ -8,6 +8,9 @@ import BookingPage from './pages/BookingPage';
 import BookingsPage from './pages/BookingsPage';
 import PhotoUploadPage from './pages/PhotoUploadPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
+import SupportPage from './pages/SupportPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import PaymentFailedPage from './pages/PaymentFailedPage';
 import TestPage from './pages/TestPage';
 import './styles/App.css';
 import NavBar from './components/NavBar';
@@ -35,6 +38,11 @@ function App() {
               <BookingsPage />
             </ErrorBoundary>
           } />
+          <Route path="/support" element={
+            <ErrorBoundary>
+              <SupportPage />
+            </ErrorBoundary>
+          } />
                       <Route path="/photos/:bookingId/:type" element={
                         <ErrorBoundary>
                           <PhotoUploadPage />
@@ -43,6 +51,16 @@ function App() {
                       <Route path="/documents/upload" element={
                         <ErrorBoundary>
                           <DocumentUploadPage />
+                        </ErrorBoundary>
+                      } />
+                      <Route path="/payment/success" element={
+                        <ErrorBoundary>
+                          <PaymentSuccessPage />
+                        </ErrorBoundary>
+                      } />
+                      <Route path="/payment/failed" element={
+                        <ErrorBoundary>
+                          <PaymentFailedPage />
                         </ErrorBoundary>
                       } />
                       <Route path="/test" element={<TestPage />} />

@@ -284,6 +284,45 @@ class TinkoffService {
   }
 
   /**
+   * Confirm HOLD (retain deposit)
+   */
+  public async confirmHold(paymentId: string): Promise<TinkoffPaymentResponse> {
+    if (!this.terminalKey || !this.secretKey) {
+      return this.createMockConfirmHold(paymentId);
+    }
+
+    try {
+      const requestData = {
+        TerminalKey: this.terminalKey,
+        PaymentId: paymentId
+      };
+
+      const token = this.generateToken(requestData);
+      (requestData as any).Token = token;
+
+      const response = await fetch(`${this.baseURL}/Confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      const result = await response.json();
+      logger.info('Tinkoff hold confirmed:', result);
+      return result as TinkoffPaymentResponse;
+
+    } catch (error) {
+      logger.error('Tinkoff hold confirmation error:', error);
+      return {
+        Success: false,
+        ErrorCode: 'NETWORK_ERROR',
+        Message: 'Network error occurred'
+      };
+    }
+  }
+
+  /**
    * Get payment status
    */
   public async getPaymentStatus(paymentId: string): Promise<TinkoffPaymentResponse> {
@@ -366,6 +405,16 @@ class TinkoffService {
       Success: true,
       TerminalKey: 'mock-terminal',
       Status: 'CANCELLED',
+      PaymentId: paymentId
+    };
+  }
+
+  private createMockConfirmHold(paymentId: string): TinkoffPaymentResponse {
+    logger.info('Confirming mock hold:', paymentId);
+    return {
+      Success: true,
+      TerminalKey: 'mock-terminal',
+      Status: 'CONFIRMED',
       PaymentId: paymentId
     };
   }

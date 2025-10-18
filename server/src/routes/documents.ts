@@ -1,6 +1,7 @@
 import express from 'express';
 import { documentService } from '../services/documentService';
-import { documentUploads, documentVerifications, users } from '../data';
+import { documentUploads, documentVerifications } from '../data';
+import { databaseService } from '../services/databaseService';
 import logger from '../utils/logger';
 
 const router = express.Router();
@@ -9,7 +10,7 @@ const router = express.Router();
  * Upload documents for verification
  * POST /api/documents/upload
  */
-router.post('/upload', async (req, res) => {
+router.post('/upload', documentService.getMulterConfig().single('document'), async (req, res) => {
   try {
     const { userId, documentType } = req.body;
 
@@ -21,7 +22,7 @@ router.post('/upload', async (req, res) => {
     }
 
     // Check if user exists
-    const user = users.get(userId);
+    const user = await databaseService.getUser(parseInt(userId));
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -29,70 +30,60 @@ router.post('/upload', async (req, res) => {
       });
     }
 
-    // Use multer middleware for file upload
-    documentService.getMulterConfig().single('document')(req, res, async (err) => {
-      if (err) {
-        logger.error('Document upload error:', err);
-        return res.status(400).json({
-          success: false,
-          error: err.message
-        });
-      }
-
-      const file = req.file;
-      if (!file) {
-        return res.status(400).json({
-          success: false,
-          error: 'No file uploaded'
-        });
-      }
-
-      // Validate file
-      const validation = documentService.validateDocumentUpload(file);
-      if (!validation.valid) {
-        return res.status(400).json({
-          success: false,
-          error: validation.error
-        });
-      }
-
-      // Create document upload record
-      const documentUpload = documentService.createDocumentUpload(userId, documentType, file);
-      documentUploads.set(documentUpload.id, documentUpload);
-
-      // OCR preview simulation
-      const ocrResult = documentService.simulateOCRPreview(file);
-
-      // Check if user already has a document verification
-      let verification = documentService.getUserDocumentVerification(userId);
-      
-      if (!verification) {
-        // Create new verification
-        verification = documentService.createDocumentVerification(userId, [documentUpload]);
-        documentVerifications.set(verification.id, verification);
-      } else {
-        // Update existing verification
-        if (documentType === 'PASSPORT') {
-          verification.documents.passport = documentUpload;
-        } else if (documentType === 'DRIVER_LICENSE') {
-          verification.documents.driverLicense = documentUpload;
-        }
-        verification.updatedAt = new Date();
-      }
-
-      logger.info(`Document uploaded for user ${userId}: ${documentType}`);
-
-      res.json({
-        success: true,
-        data: {
-          documentId: documentUpload.id,
-          filename: documentUpload.filename,
-          documentType: documentUpload.type,
-          ocrPreview: ocrResult,
-          verificationStatus: verification.status
-        },
-        message: 'Document uploaded successfully'
+    // File should be available in req.file after multer processing
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded'
       });
+    }
+
+    // Validate file
+    const validation = documentService.validateDocumentUpload(file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    // Create document upload record
+    const documentUpload = documentService.createDocumentUpload(userId, documentType, file);
+    documentUploads.set(documentUpload.id, documentUpload);
+
+    // OCR preview simulation
+    const ocrResult = documentService.simulateOCRPreview(file);
+
+    // Check if user already has a document verification
+    let verification = documentService.getUserDocumentVerification(userId);
+    
+    if (!verification) {
+      // Create new verification
+      verification = documentService.createDocumentVerification(userId, [documentUpload]);
+      documentVerifications.set(verification.id, verification);
+    } else {
+      // Update existing verification
+      if (documentType === 'PASSPORT') {
+        verification.documents.passport = documentUpload;
+      } else if (documentType === 'DRIVER_LICENSE') {
+        verification.documents.driverLicense = documentUpload;
+      }
+      verification.updatedAt = new Date();
+    }
+
+    logger.info(`Document uploaded for user ${userId}: ${documentType}`);
+
+    res.json({
+      success: true,
+      data: {
+        documentId: documentUpload.id,
+        filename: documentUpload.filename,
+        documentType: documentUpload.type,
+        ocrPreview: ocrResult,
+        verificationStatus: verification.status
+      },
+      message: 'Document uploaded successfully'
     });
 
   } catch (error) {
@@ -112,7 +103,7 @@ router.get('/verification/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const user = users.get(userId);
+    const user = await databaseService.getUser(parseInt(userId));
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -180,8 +171,8 @@ router.delete('/:documentId', async (req, res) => {
   try {
     const { documentId } = req.params;
 
-    const document = documentUploads.get(documentId);
-    if (!document) {
+    const documentUpload = documentUploads.get(documentId);
+    if (!documentUpload) {
       return res.status(404).json({
         success: false,
         error: 'Document not found'
@@ -189,27 +180,27 @@ router.delete('/:documentId', async (req, res) => {
     }
 
     // Delete file from filesystem
-    const deleted = documentService.deleteDocument(document.filename);
+    const deleted = documentService.deleteDocument(documentUpload.filename);
     if (!deleted) {
-      logger.warn(`Failed to delete file for document ${documentId}`);
+      logger.warn(`Failed to delete file: ${documentUpload.filename}`);
     }
 
-    // Remove from memory
+    // Remove from in-memory storage
     documentUploads.delete(documentId);
 
-    // Update verification if needed
-    const verification = documentService.getUserDocumentVerification(document.userId);
+    // Update verification if exists
+    const verification = documentService.getUserDocumentVerification(documentUpload.userId);
     if (verification) {
       if (verification.documents.passport?.id === documentId) {
-        delete verification.documents.passport;
+        verification.documents.passport = null;
       }
       if (verification.documents.driverLicense?.id === documentId) {
-        delete verification.documents.driverLicense;
+        verification.documents.driverLicense = null;
       }
       verification.updatedAt = new Date();
     }
 
-    logger.info(`Document ${documentId} deleted`);
+    logger.info(`Document deleted: ${documentId}`);
 
     res.json({
       success: true,
@@ -234,8 +225,8 @@ router.get('/pending', async (req, res) => {
     // TODO: Add admin authentication check
     const pendingVerifications = documentService.getPendingVerifications();
 
-    const result = pendingVerifications.map(verification => {
-      const user = users.get(verification.userId);
+    const result = await Promise.all(pendingVerifications.map(async (verification) => {
+      const user = await databaseService.getUser(parseInt(verification.userId));
       return {
         id: verification.id,
         userId: verification.userId,
@@ -265,7 +256,7 @@ router.get('/pending', async (req, res) => {
         createdAt: verification.createdAt,
         updatedAt: verification.updatedAt
       };
-    });
+    }));
 
     res.json({
       success: true,
@@ -288,47 +279,54 @@ router.get('/pending', async (req, res) => {
 router.post('/verification/:verificationId/status', async (req, res) => {
   try {
     const { verificationId } = req.params;
-    const { status, moderatorId, comment } = req.body;
-
-    if (!status || !moderatorId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing status or moderatorId'
-      });
-    }
-
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid status. Must be APPROVED or REJECTED'
-      });
-    }
+    const { status, moderatorComment } = req.body;
 
     // TODO: Add admin authentication check
 
-    const success = documentService.updateDocumentVerification(
-      verificationId,
-      status,
-      moderatorId,
-      comment
-    );
-
-    if (!success) {
-      return res.status(404).json({
+    if (!['PENDING', 'VERIFIED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({
         success: false,
-        error: 'Document verification not found'
+        error: 'Invalid status'
       });
     }
 
-    logger.info(`Document verification ${verificationId} updated to ${status} by moderator ${moderatorId}`);
+    const verification = documentVerifications.get(verificationId);
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        error: 'Verification not found'
+      });
+    }
+
+    verification.status = status;
+    verification.moderatorComment = moderatorComment || null;
+    verification.updatedAt = new Date();
+
+    // Update user verification status
+    const user = await databaseService.getUser(parseInt(verification.userId));
+    if (user) {
+      const newStatus = status === 'VERIFIED' ? 'VERIFIED' : 
+                       status === 'REJECTED' ? 'REJECTED' : 'PENDING';
+      await databaseService.updateUser(user.id, {
+        verificationStatus: newStatus
+      });
+    }
+
+    logger.info(`Document verification status updated: ${verificationId} -> ${status}`);
 
     res.json({
       success: true,
-      message: 'Document verification status updated successfully'
+      data: {
+        id: verification.id,
+        status: verification.status,
+        moderatorComment: verification.moderatorComment,
+        updatedAt: verification.updatedAt
+      },
+      message: 'Verification status updated successfully'
     });
 
   } catch (error) {
-    logger.error('Update document verification error:', error);
+    logger.error('Update verification status error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

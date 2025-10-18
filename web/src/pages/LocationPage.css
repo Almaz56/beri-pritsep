@@ -1,5 +1,6 @@
 .location-page {
   padding: 16px;
+  padding-bottom: 80px; /* Space for fixed navbar */
   max-width: 1200px;
   margin: 0 auto;
   min-height: 100vh;

@@ -19,31 +19,27 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ type, id, name, onClose }) =>
     setError(null);
 
     try {
-      // Mock API call - in real app would call actual API
-      const mockUrl = type === 'LOCATION' 
-        ? `https://app.beripritsep.ru/?location_id=${id}`
-        : `https://app.beripritsep.ru/trailer/${id}`;
+      // Call real API
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 
+        (window.location.hostname === 'admin.beripritsep.ru' 
+          ? 'https://api.beripritsep.ru/api' 
+          : 'http://localhost:8080/api');
       
-      setUrl(mockUrl);
+      const endpoint = type === 'LOCATION' 
+        ? `${API_BASE_URL}/qr/location/${id}`
+        : `${API_BASE_URL}/qr/trailer/${id}`;
+      
+      const response = await fetch(endpoint);
+      const data = await response.json();
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Generate mock QR code (in real app would be actual QR generation)
-      const mockQRCode = `data:image/svg+xml;base64,${btoa(`
-        <svg width="300" height="300" xmlns="http://www.w3.org/2000/svg">
-          <rect width="300" height="300" fill="white"/>
-          <text x="150" y="150" text-anchor="middle" font-family="Arial" font-size="12" fill="black">
-            QR Code for ${name}
-          </text>
-          <text x="150" y="170" text-anchor="middle" font-family="Arial" font-size="10" fill="gray">
-            ${type} - ${id}
-          </text>
-        </svg>
-      `)}`;
-
-      setQrCode(mockQRCode);
+      if (data.success && data.data) {
+        setQrCode(data.data.qrCode);
+        setUrl(data.data.url);
+      } else {
+        setError(data.error || 'Ошибка генерации QR-кода');
+      }
     } catch (err) {
+      console.error('QR generation error:', err);
       setError('Ошибка генерации QR-кода');
     } finally {
       setLoading(false);

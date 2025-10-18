@@ -7,14 +7,32 @@ import './LocationPage.css';
 const LocationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const locationId = searchParams.get('location_id');
+  const startapp = searchParams.get('startapp');
   
   const [trailers, setTrailers] = useState<Trailer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Handle Telegram Mini App startapp parameter
+    if (startapp) {
+      if (startapp.startsWith('location_')) {
+        const extractedLocationId = startapp.replace('location_', '');
+        // Update URL to include location_id parameter
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.set('location_id', extractedLocationId);
+        newSearchParams.delete('startapp'); // Remove startapp parameter
+        window.history.replaceState({}, '', `?${newSearchParams.toString()}`);
+      } else if (startapp.startsWith('trailer_')) {
+        const trailerId = startapp.replace('trailer_', '');
+        // Redirect to trailer page
+        window.location.href = `/trailer/${trailerId}`;
+        return;
+      }
+    }
+    
     loadTrailers();
-  }, [locationId]);
+  }, [locationId, startapp, searchParams]);
 
   const loadTrailers = async () => {
     try {
@@ -41,6 +59,7 @@ const LocationPage: React.FC = () => {
   };
 
   const formatDimensions = (dimensions: Trailer['dimensions']) => {
+    if (!dimensions) return 'Не указано';
     return `${dimensions.length / 1000}м × ${dimensions.width / 1000}м × ${dimensions.height / 1000}м`;
   };
 
@@ -159,9 +178,9 @@ const LocationPage: React.FC = () => {
                 </div>
                 
                 <div className="spec-item">
-                  <span className="spec-label">Тент:</span>
+                  <span className="spec-label">Особенности:</span>
                   <span className="spec-value">
-                    {trailer.hasTent ? '✅ Есть' : '❌ Нет'}
+                    {trailer.features.length > 0 ? trailer.features.join(', ') : 'Нет'}
                   </span>
                 </div>
               </div>
@@ -169,15 +188,15 @@ const LocationPage: React.FC = () => {
               <div className="trailer-pricing">
                 <div className="price-item">
                   <span className="price-label">Минимум:</span>
-                  <span className="price-value">{trailer.pricing.minCost}₽</span>
+                  <span className="price-value">{trailer.minRentalHours}ч = {trailer.minRentalPrice}₽</span>
                 </div>
                 <div className="price-item">
-                  <span className="price-label">Час:</span>
-                  <span className="price-value">{trailer.pricing.hourPrice}₽</span>
+                  <span className="price-label">Доп. час:</span>
+                  <span className="price-value">{trailer.extraHourPrice}₽</span>
                 </div>
                 <div className="price-item">
                   <span className="price-label">Сутки:</span>
-                  <span className="price-value">{trailer.pricing.dayPrice}₽</span>
+                  <span className="price-value">{trailer.dailyRate}₽</span>
                 </div>
               </div>
 

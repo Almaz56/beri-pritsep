@@ -40,7 +40,9 @@ class QRService {
    * Generate QR code for a location
    */
   async generateLocationQR(locationId: string, locationName: string): Promise<{ dataUrl: string; url: string }> {
-    const url = `${this.baseUrl}/?location_id=${locationId}`;
+    // Use Telegram Mini App URL format
+    const botUsername = process.env['BOT_USERNAME'] || 'beripritsep_bot';
+    const url = `https://t.me/${botUsername}?startapp=location_${locationId}`;
     const qrData: QRCodeData = {
       type: 'LOCATION',
       id: locationId,
@@ -67,7 +69,9 @@ class QRService {
    * Generate QR code for a trailer
    */
   async generateTrailerQR(trailerId: string, trailerName: string): Promise<{ dataUrl: string; url: string }> {
-    const url = `${this.baseUrl}/trailer/${trailerId}`;
+    // Use Telegram Mini App URL format
+    const botUsername = process.env['BOT_USERNAME'] || 'beripritsep_bot';
+    const url = `https://t.me/${botUsername}?startapp=trailer_${trailerId}`;
     const qrData: QRCodeData = {
       type: 'TRAILER',
       id: trailerId,
@@ -155,8 +159,8 @@ class QRService {
    */
   validateQRData(data: string): { valid: boolean; type?: 'LOCATION' | 'TRAILER'; id?: string } {
     try {
-      // Check if it's a location URL
-      const locationMatch = data.match(/\?location_id=([^&]+)/);
+      // Check if it's a Telegram Mini App location URL
+      const locationMatch = data.match(/startapp=location_([^&]+)/);
       if (locationMatch) {
         return {
           valid: true,
@@ -165,13 +169,32 @@ class QRService {
         };
       }
 
-      // Check if it's a trailer URL
-      const trailerMatch = data.match(/\/trailer\/([^?]+)/);
+      // Check if it's a Telegram Mini App trailer URL
+      const trailerMatch = data.match(/startapp=trailer_([^&]+)/);
       if (trailerMatch) {
         return {
           valid: true,
           type: 'TRAILER',
           id: trailerMatch[1]
+        };
+      }
+
+      // Legacy support for old format
+      const legacyLocationMatch = data.match(/\?location_id=([^&]+)/);
+      if (legacyLocationMatch) {
+        return {
+          valid: true,
+          type: 'LOCATION',
+          id: legacyLocationMatch[1]
+        };
+      }
+
+      const legacyTrailerMatch = data.match(/\/trailer\/([^?]+)/);
+      if (legacyTrailerMatch) {
+        return {
+          valid: true,
+          type: 'TRAILER',
+          id: legacyTrailerMatch[1]
         };
       }
 

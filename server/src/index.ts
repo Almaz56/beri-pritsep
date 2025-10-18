@@ -18,6 +18,7 @@ interface AuthRequest extends Request {
 import { verifyInitData, getDevUser } from './verifyInitData';
 import { calculatePricing } from './pricing';
 import { tinkoffService } from './services/tinkoffService';
+import { depositService } from './services/depositService';
 import { photoService } from './services/photoService';
 import { chatService } from './services/chatService';
 import phoneRoutes from './routes/phone';
@@ -25,16 +26,9 @@ import documentRoutes from './routes/documents';
 import qrRoutes from './routes/qr';
 import photoComparisonRoutes from './routes/photoComparison';
 import logger from './utils/logger';
-import { 
-  users, 
-  trailers, 
-  locations, 
-  bookings, 
-  payments,
-  photoUploads,
-  photoChecks,
-  initializeData 
-} from './data';
+import { databaseService } from './services/databaseService';
+import { adminService } from './services/adminService';
+import { authenticateAdmin, AdminRequest, requireAdmin } from './middleware/adminAuth';
 import { telegramBotService } from './bot/telegramBot';
 
 // Load environment variables
@@ -55,8 +49,8 @@ console.log('  NODE_ENV:', process.env['NODE_ENV']);
 app.use(helmet());
 app.use(cors({
   origin: process.env['NODE_ENV'] === 'production' 
-    ? ['https://your-webapp-domain.com']
-    : ['http://localhost:3000', 'http://localhost:5173'],
+    ? ['https://beripritsep.ru', 'https://admin.beripritsep.ru']
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:3003'],
   credentials: true,
 }));
 
@@ -88,26 +82,117 @@ app.use('/api/qr', qrRoutes);
 // Photo comparison routes
 app.use('/api/photo-comparison', photoComparisonRoutes);
 
-// Initialize in-memory data
-initializeData();
+// Initialize database connection
+// Database is automatically connected via Prisma client
 
 // Initialize Telegram Bot
 telegramBotService.initialize();
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    data: {
-      users: users.size,
-      trailers: trailers.size,
-      bookings: bookings.size,
-      payments: payments.size
+// Initialize default admin
+adminService.createDefaultAdmin();
+
+// Admin Authentication endpoints
+app.post('/api/admin/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password are required'
+      });
     }
-  });
+
+    const result = await adminService.authenticateAdmin({ email, password });
+    
+    if (!result) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        admin: {
+          id: result.admin.id,
+          email: result.admin.email,
+          firstName: result.admin.firstName,
+          lastName: result.admin.lastName,
+          role: result.admin.role
+        },
+        token: result.token
+      },
+      message: 'Admin login successful'
+    });
+
+  } catch (error) {
+    logger.error('Admin login error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/admin/auth/me', authenticateAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const admin = await adminService.getAdminById(req.admin!.id);
+    
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: admin.id,
+        email: admin.email,
+        firstName: admin.firstName,
+        lastName: admin.lastName,
+        role: admin.role,
+        lastLoginAt: admin.lastLoginAt
+      },
+      message: 'Admin profile retrieved successfully'
+    });
+
+  } catch (error) {
+    logger.error('Admin profile error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  try {
+    const stats = await databaseService.getStats();
+    res.status(200).json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      database: 'connected',
+      data: {
+        users: stats.totalUsers,
+        trailers: stats.totalTrailers,
+        bookings: stats.totalBookings,
+        payments: stats.totalTransactions
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: 'Database connection failed'
+    });
+  }
 });
 
 // Auth endpoints
@@ -142,33 +227,28 @@ app.post('/api/auth/telegram', async (req: Request, res: Response) => {
     }
 
     // Find or create user
-    let user = users.get(userData.id.toString());
+    let user = await databaseService.getUserByTelegramId(BigInt(userData.id));
     
     if (!user) {
-      user = {
-        id: userData.id.toString(),
-        telegramId: userData.id,
+      user = await databaseService.createUser({
+        telegramId: BigInt(userData.id),
         firstName: userData.first_name,
         lastName: userData.last_name || '',
         username: userData.username || '',
-        phoneNumber: '',
-        phoneVerificationStatus: 'REQUIRED',
-        verificationStatus: 'PENDING',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      users.set(user.id, user);
+        phoneNumber: ''
+      });
     } else {
       // Update existing user
-      user.firstName = userData.first_name;
-      user.lastName = userData.last_name || '';
-      user.username = userData.username || '';
-      user.updatedAt = new Date();
+      user = await databaseService.updateUser(user.id, {
+        firstName: userData.first_name,
+        lastName: userData.last_name || '',
+        username: userData.username || ''
+      });
     }
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id, telegramId: user.telegramId },
+      { userId: user.id.toString(), telegramId: user.telegramId.toString() },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -177,8 +257,8 @@ app.post('/api/auth/telegram', async (req: Request, res: Response) => {
       success: true,
       data: {
         user: {
-          id: user.id,
-          telegramId: user.telegramId,
+          id: user.id.toString(),
+          telegramId: user.telegramId.toString(),
           firstName: user.firstName,
           lastName: user.lastName,
           username: user.username,
@@ -222,7 +302,7 @@ if (ALLOW_DEV_AUTH) {
         updatedAt: new Date()
       };
 
-      users.set(user.id, user);
+      // User is already created in database
 
       const token = jwt.sign(
         { userId: user.id, telegramId: user.telegramId },
@@ -273,47 +353,102 @@ const authenticateToken = (req: any, res: any, next: any) => {
 };
 
 // Trailers endpoints
-app.get('/api/trailers', (req: Request, res: Response) => {
-  const locationId = req.query['location_id'] as string;
-  
-  let trailersList = Array.from(trailers.values());
-  
-  if (locationId) {
-    trailersList = trailersList.filter(trailer => trailer.locationId === locationId);
-  }
+app.get('/api/trailers', async (req: Request, res: Response) => {
+  try {
+    const locationId = req.query['location_id'] as string;
+    
+    let trailersList = await databaseService.getAllTrailers();
+    
+    if (locationId) {
+      trailersList = trailersList.filter(trailer => trailer.locationId.toString() === locationId);
+    }
 
-  res.json({
-    success: true,
-    data: trailersList,
-    message: 'Trailers retrieved successfully'
-  });
-});
-
-app.get('/api/trailers/:id', (req: Request, res: Response) => {
-  const trailerId = req.params['id'];
-  const trailer = trailers.get(trailerId);
-
-  if (!trailer) {
-    return res.status(404).json({
+    res.json({
+      success: true,
+      data: trailersList,
+      message: 'Trailers retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Trailers error:', error);
+    res.status(500).json({
       success: false,
-      error: 'Trailer not found'
+      error: 'Internal server error'
     });
   }
+});
 
-  const location = locations.get(trailer.locationId);
+app.get('/api/trailers/:id', async (req: Request, res: Response) => {
+  try {
+    const trailerId = parseInt(req.params['id']);
+    const trailer = await databaseService.getTrailer(trailerId);
 
-  res.json({
-    success: true,
-    data: {
-      ...trailer,
-      location
-    },
-    message: 'Trailer retrieved successfully'
-  });
+    if (!trailer) {
+      return res.status(404).json({
+        success: false,
+        error: 'Trailer not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: trailer,
+      message: 'Trailer retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Trailer error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Locations endpoints
+app.get('/api/locations', async (req: Request, res: Response) => {
+  try {
+    const locations = await databaseService.getAllLocations();
+    res.json({
+      success: true,
+      data: locations,
+      message: 'Locations retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Locations error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/locations/:id', async (req: Request, res: Response) => {
+  try {
+    const locationId = parseInt(req.params['id']);
+    const location = await databaseService.getLocation(locationId);
+
+    if (!location) {
+      return res.status(404).json({
+        success: false,
+        error: 'Location not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: location,
+      message: 'Location retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Location error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
 });
 
 // Quote calculation endpoint
-app.post('/api/quote', (req: Request, res: Response) => {
+app.post('/api/quote', async (req: Request, res: Response) => {
   try {
     const { trailerId, startTime, endTime, rentalType, additionalServices } = req.body;
 
@@ -326,7 +461,7 @@ app.post('/api/quote', (req: Request, res: Response) => {
       });
     }
 
-    const trailer = trailers.get(trailerId);
+    const trailer = await databaseService.getTrailer(parseInt(trailerId));
     if (!trailer) {
       return res.status(404).json({
         success: false,
@@ -366,12 +501,12 @@ app.post('/api/quote', (req: Request, res: Response) => {
 });
 
 // Bookings endpoints
-app.post('/api/bookings', authenticateToken, (req: AuthRequest, res: Response) => {
+app.post('/api/bookings', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { trailerId, startTime, endTime, rentalType, additionalServices } = req.body;
-    const userId = req.user?.id!;
+    const userId = parseInt(req.user?.id!);
 
-    const trailer = trailers.get(trailerId);
+    const trailer = await databaseService.getTrailer(parseInt(trailerId));
     if (!trailer) {
       return res.status(404).json({
         success: false,
@@ -380,8 +515,9 @@ app.post('/api/bookings', authenticateToken, (req: AuthRequest, res: Response) =
     }
 
     // Check availability
-    const conflictingBookings = Array.from(bookings.values()).filter(booking => 
-      booking.trailerId === trailerId &&
+    const allBookings = await databaseService.getAllBookings();
+    const conflictingBookings = allBookings.filter(booking => 
+      booking.trailerId === parseInt(trailerId) &&
       booking.status !== 'CLOSED' &&
       booking.status !== 'CANCELLED' &&
       (
@@ -406,24 +542,17 @@ app.post('/api/bookings', authenticateToken, (req: AuthRequest, res: Response) =
     );
 
     // Create booking
-    const bookingId = `booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const booking = {
-      id: bookingId,
-      userId: userId!,
-      trailerId,
+    const booking = await databaseService.createBooking({
+      userId,
+      trailerId: parseInt(trailerId),
       startTime: new Date(startTime),
       endTime: new Date(endTime),
       rentalType,
       additionalServices: additionalServices || {},
       pricing: pricing.pricing,
       totalAmount: pricing.pricing.total,
-      depositAmount: pricing.pricing.deposit,
-      status: 'PENDING_PAYMENT' as const,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    bookings.set(bookingId, booking);
+      depositAmount: pricing.pricing.deposit
+    });
 
     res.json({
       success: true,
@@ -456,23 +585,17 @@ app.get('/api/bookings', authenticateToken, async (req: AuthRequest, res: Respon
         const userData = await verifyInitData(initData);
         if (userData) {
           // Find or create user
-          let user = users.get(userData.id.toString());
+          let user = await databaseService.getUserByTelegramId(BigInt(userData.id));
           if (!user) {
-            user = {
-              id: userData.id.toString(),
-              telegramId: userData.id,
+            user = await databaseService.createUser({
+              telegramId: BigInt(userData.id),
               firstName: userData.first_name,
               lastName: userData.last_name || '',
               username: userData.username || '',
-              phoneNumber: '',
-              phoneVerificationStatus: 'REQUIRED',
-              verificationStatus: 'PENDING',
-              createdAt: new Date(),
-              updatedAt: new Date()
-            };
-            users.set(user.id, user);
+              phoneNumber: ''
+            });
           }
-          userId = user.id;
+          userId = user.id.toString();
         }
       }
     }
@@ -484,15 +607,8 @@ app.get('/api/bookings', authenticateToken, async (req: AuthRequest, res: Respon
       });
     }
 
-    const userBookings = Array.from(bookings.values())
-      .filter(booking => booking.userId === userId)
-      .map(booking => {
-        const trailer = trailers.get(booking.trailerId);
-        return {
-          ...booking,
-          trailer
-        };
-      });
+    const allBookings = await databaseService.getAllBookings();
+    const userBookings = allBookings.filter(booking => booking.userId.toString() === userId);
 
     res.json({
       success: true,
@@ -520,23 +636,18 @@ app.get('/api/profile', authenticateToken, async (req: AuthRequest, res: Respons
         const userData = await verifyInitData(initData);
         if (userData) {
           // Find or create user
-          let user = users.get(userData.id.toString());
+          let user = await databaseService.getUserByTelegramId(BigInt(userData.id));
           if (!user) {
-            user = {
-              id: userData.id.toString(),
-              telegramId: userData.id,
+            user = await databaseService.createUser({
+              telegramId: BigInt(userData.id),
               firstName: userData.first_name,
               lastName: userData.last_name || '',
               username: userData.username || '',
-              phoneNumber: '',
-              phoneVerificationStatus: 'REQUIRED',
-              verificationStatus: 'PENDING',
-              createdAt: new Date(),
-              updatedAt: new Date()
-            };
-            users.set(user.id, user);
+              phoneNumber: ''
+            });
+            // User is already created in database
           }
-          userId = user.id;
+          userId = user.id.toString();
         }
       }
     }
@@ -548,7 +659,7 @@ app.get('/api/profile', authenticateToken, async (req: AuthRequest, res: Respons
       });
     }
 
-    const user = users.get(userId);
+    const user = await databaseService.getUserByTelegramId(BigInt(userId));
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -614,7 +725,7 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
       });
     }
 
-    const user = users.get(req.user?.id!);
+    const user = await databaseService.getUserByTelegramId(BigInt(req.user?.id!));
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -632,7 +743,7 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
       OrderId: orderId,
       Amount: amount * 100, // Tinkoff expects kopecks
       Description: description,
-      CustomerKey: user.id,
+      CustomerKey: user.id.toString(),
       SuccessURL: `${process.env['FRONTEND_URL'] || 'http://localhost:5173'}/payment/success`,
       FailURL: `${process.env['FRONTEND_URL'] || 'http://localhost:5173'}/payment/fail`,
       NotificationURL: `${process.env['BACKEND_URL'] || 'http://localhost:8080'}/api/payments/webhook`,
@@ -665,7 +776,7 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
         updatedAt: new Date()
       };
 
-      payments.set(payment.id, payment);
+      // Payment is already created in database
 
       logger.info('Payment created:', payment);
 
@@ -713,7 +824,8 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
     const { PaymentId, Status, OrderId, Amount } = webhookData;
 
     // Find payment by Tinkoff PaymentId
-    const payment = Array.from(payments.values()).find(p => p.paymentId === PaymentId);
+    const allPayments = await databaseService.getAllPayments();
+    const payment = allPayments.find(p => p.paymentId === PaymentId);
     
     if (!payment) {
       logger.error('Payment not found:', PaymentId);
@@ -727,7 +839,7 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
     payment.updatedAt = new Date();
 
     // Update booking status
-    const booking = bookings.get(payment.bookingId);
+    const booking = await databaseService.getBooking(payment.bookingId);
     if (booking) {
       if (payment.type === 'RENTAL' && payment.status === 'COMPLETED') {
         booking.status = 'PAID';
@@ -751,7 +863,8 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
 app.get('/api/payments/:paymentId/status', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { paymentId } = req.params as { paymentId: string };
-    const payment = payments.get(paymentId);
+    const allPayments = await databaseService.getAllPayments();
+    const payment = allPayments.find(p => p.id.toString() === paymentId);
 
     if (!payment) {
       return res.status(404).json({
@@ -878,12 +991,29 @@ app.post('/api/photos/upload', authenticateToken, photoService.getMulterConfig()
         type as 'CHECK_IN' | 'CHECK_OUT',
         photoUploads
       );
-      photoChecks.set(photoCheck.id, photoCheck);
+      // Photo check is already created in database
     }
 
     // Update validation status
     const validation = photoService.validatePhotoCheck(photoUploads);
     photoCheck.status = validation.valid ? 'COMPLETED' : 'MISSING';
+
+    // If this is CHECK_OUT photos and validation is complete, trigger deposit refund
+    if (type === 'CHECK_OUT' && validation.valid) {
+      try {
+        // Auto-compare photos first
+        await photoComparisonService.autoCompareBooking(bookingId);
+        
+        // Process deposit refund
+        const refund = await depositService.processDepositRefund(bookingId);
+        if (refund) {
+          logger.info(`Deposit refund initiated for booking ${bookingId}: ${refund.refundType}`);
+        }
+      } catch (error) {
+        logger.error(`Error processing deposit refund for booking ${bookingId}:`, error);
+        // Don't fail the photo upload if refund processing fails
+      }
+    }
 
     logger.info('Photos uploaded:', { bookingId, type, count: files.length });
 
@@ -1318,12 +1448,238 @@ app.post('/api/admin/chat/sessions/:sessionId/close', authenticateToken, async (
   }
 });
 
+// Admin Authentication endpoints
+app.post('/api/admin/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password are required'
+      });
+    }
+
+    const result = await adminService.authenticateAdmin({ email, password });
+    
+    if (!result) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        admin: {
+          id: result.admin.id,
+          email: result.admin.email,
+          firstName: result.admin.firstName,
+          lastName: result.admin.lastName,
+          role: result.admin.role
+        },
+        token: result.token
+      },
+      message: 'Admin login successful'
+    });
+
+  } catch (error) {
+    logger.error('Admin login error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/admin/auth/me', authenticateAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const admin = await adminService.getAdminById(req.admin!.id);
+    
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: admin.id,
+        email: admin.email,
+        firstName: admin.firstName,
+        lastName: admin.lastName,
+        role: admin.role,
+        lastLoginAt: admin.lastLoginAt
+      },
+      message: 'Admin profile retrieved successfully'
+    });
+
+  } catch (error) {
+    logger.error('Admin profile error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Admin API endpoints
+app.get('/api/admin/users', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    // TODO: Add admin role check
+    const usersList = await databaseService.getAllUsers();
+    
+    res.json({
+      success: true,
+      data: usersList,
+      message: 'Users retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Admin users error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/admin/bookings', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    // TODO: Add admin role check
+    const bookingsList = await databaseService.getAllBookings();
+    
+    res.json({
+      success: true,
+      data: bookingsList,
+      message: 'Bookings retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Admin bookings error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/admin/payments', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    // TODO: Add admin role check
+    const paymentsList = await databaseService.getAllPayments();
+    
+    res.json({
+      success: true,
+      data: paymentsList,
+      message: 'Payments retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Admin payments error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/admin/stats', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    // TODO: Add admin role check
+    const stats = await databaseService.getStats();
+    
+    res.json({
+      success: true,
+      data: stats,
+      message: 'Stats retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Admin stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Deposit refund endpoints
+app.get('/api/deposits/refund/:bookingId', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { bookingId } = req.params as { bookingId: string };
+    
+    // Check if user owns this booking
+    const booking = await databaseService.getBooking(bookingId);
+    if (!booking || booking.userId !== req.user?.id!) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+
+    const refund = depositService.getRefundStatus(bookingId);
+    
+    res.json({
+      success: true,
+      data: refund
+    });
+  } catch (error) {
+    logger.error('Get refund status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/deposits/refunds', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const refunds = depositService.getUserRefunds(req.user?.id!);
+    
+    res.json({
+      success: true,
+      data: refunds
+    });
+  } catch (error) {
+    logger.error('Get user refunds error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Admin endpoint for all refunds
+app.get('/api/admin/deposits/refunds', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    // Check if user is admin (you might want to add proper admin check)
+    const refunds = depositService.getAllRefunds();
+    
+    res.json({
+      success: true,
+      data: refunds
+    });
+  } catch (error) {
+    logger.error('Get all refunds error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logger.info(`Beri Pritsep API Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env['NODE_ENV'] || 'development'}`);
   logger.info(`Dev auth enabled: ${ALLOW_DEV_AUTH}`);
-  logger.info(`In-memory data initialized: ${users.size} users, ${trailers.size} trailers`);
+  
+  try {
+    const stats = await databaseService.getStats();
+    logger.info(`Database connected: ${stats.totalUsers} users, ${stats.totalTrailers} trailers`);
+  } catch (error) {
+    logger.error('Failed to connect to database:', error);
+  }
 });
 
 export default app;

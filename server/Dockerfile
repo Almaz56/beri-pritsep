@@ -11,14 +11,23 @@ COPY tsconfig.json ./
 # Install all dependencies (including dev dependencies for build)
 RUN npm ci && npm cache clean --force
 
+# Copy Prisma schema
+COPY prisma/ ./prisma/
+
 # Copy source code
 COPY src/ ./src/
 
-# Build the application
-RUN npm run build
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build only production server
+RUN npx tsc src/production-server.ts --outDir dist --target es2020 --module commonjs --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck
 
 # Production stage
 FROM node:18-alpine AS production
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
 
 # Create app user
 RUN addgroup -g 1001 -S nodejs
@@ -33,10 +42,14 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
+# Copy Prisma schema and generated client
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Create uploads and logs directories
+# Create uploads and logs directories and set correct ownership
 RUN mkdir -p uploads logs && chown -R beripritsep:nodejs uploads logs
 
 # Switch to non-root user
@@ -50,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # Start the application
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/production-server.js"]

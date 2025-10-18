@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { bookingsApi, type Trailer, type BookingRequest } from '../api';
 import { showTelegramAlert, setupTelegramMainButton, hideTelegramMainButton } from '../telegram';
 import { getAuthToken } from '../api';
+import PaymentHandler from '../components/PaymentHandler';
 import './BookingPage.css';
 
 interface BookingState {
@@ -22,6 +23,8 @@ const BookingPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [paymentStep, setPaymentStep] = useState<'booking' | 'rental' | 'deposit'>('booking');
   
   const state = location.state as BookingState;
 
@@ -32,16 +35,20 @@ const BookingPage: React.FC = () => {
       return;
     }
 
-    // Setup Telegram Main Button
-    setupTelegramMainButton('Подтвердить бронирование', handleConfirmBooking, {
-      color: '#4CAF50',
-      textColor: '#ffffff'
-    });
+    // Setup Telegram Main Button based on payment step
+    if (paymentStep === 'booking') {
+      setupTelegramMainButton('Создать бронирование', handleConfirmBooking, {
+        color: '#4CAF50',
+        textColor: '#ffffff'
+      });
+    } else {
+      hideTelegramMainButton();
+    }
 
     return () => {
       hideTelegramMainButton();
     };
-  }, [state, navigate]);
+  }, [state, navigate, paymentStep]);
 
   const handleConfirmBooking = async () => {
     if (!state) return;
@@ -51,6 +58,7 @@ const BookingPage: React.FC = () => {
       setError(null);
 
       const token = getAuthToken();
+      console.log('Booking token:', token);
       if (!token) {
         showTelegramAlert('Ошибка: необходимо авторизоваться');
         navigate('/profile');
@@ -81,8 +89,9 @@ const BookingPage: React.FC = () => {
       const response = await bookingsApi.createBooking(bookingRequest, token);
       
       if (response.success && response.data) {
-        showTelegramAlert('Бронирование создано успешно!');
-        navigate('/profile');
+        setBookingId(response.data.id);
+        setPaymentStep('rental');
+        showTelegramAlert('Бронирование создано! Теперь нужно оплатить аренду.');
       } else {
         setError(response.error || 'Ошибка создания бронирования');
         showTelegramAlert(response.error || 'Ошибка создания бронирования');
@@ -98,6 +107,24 @@ const BookingPage: React.FC = () => {
 
   const handleCancel = () => {
     navigate(-1);
+  };
+
+  const handleRentalPaymentSuccess = () => {
+    setPaymentStep('deposit');
+    showTelegramAlert('Аренда оплачена! Теперь нужно заблокировать залог.');
+  };
+
+  const handleRentalPaymentError = (error: string) => {
+    setError(error);
+  };
+
+  const handleDepositPaymentSuccess = () => {
+    showTelegramAlert('Все платежи завершены! Бронирование готово к использованию.');
+    navigate('/profile');
+  };
+
+  const handleDepositPaymentError = (error: string) => {
+    setError(error);
   };
 
   if (!state) {
@@ -169,7 +196,7 @@ const BookingPage: React.FC = () => {
               <p>{state.trailer.description}</p>
               <div className="trailer-specs">
                 <span>Грузоподъемность: {state.trailer.capacity} кг</span>
-                <span>Тент: {state.trailer.hasTent ? 'Есть' : 'Нет'}</span>
+                <span>Особенности: {state.trailer.features.length > 0 ? state.trailer.features.join(', ') : 'Нет'}</span>
               </div>
             </div>
           </div>
@@ -242,7 +269,7 @@ const BookingPage: React.FC = () => {
               
               <div className="price-total">
                 <span className="total-label">Итого к оплате:</span>
-                <span className="total-value">{state.quote.pricing.total || 0}₽</span>
+                <span className="total-value">{(state.quote.pricing.baseCost + state.quote.pricing.additionalCost) || 0}₽</span>
               </div>
             </div>
           </div>
@@ -252,6 +279,33 @@ const BookingPage: React.FC = () => {
         {error && (
           <div className="error-message">
             <p>{error}</p>
+          </div>
+        )}
+
+        {/* Payment Steps */}
+        {paymentStep === 'rental' && bookingId && (
+          <div className="booking-section">
+            <h2>Оплата аренды</h2>
+            <PaymentHandler
+              bookingId={bookingId}
+              amount={state.quote.pricing.baseCost + state.quote.pricing.additionalCost}
+              paymentType="RENTAL"
+              onSuccess={handleRentalPaymentSuccess}
+              onError={handleRentalPaymentError}
+            />
+          </div>
+        )}
+
+        {paymentStep === 'deposit' && bookingId && (
+          <div className="booking-section">
+            <h2>Залог (HOLD)</h2>
+            <PaymentHandler
+              bookingId={bookingId}
+              amount={state.quote.pricing.deposit}
+              paymentType="DEPOSIT_HOLD"
+              onSuccess={handleDepositPaymentSuccess}
+              onError={handleDepositPaymentError}
+            />
           </div>
         )}
 

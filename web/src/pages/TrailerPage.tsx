@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { trailersApi, quoteApi, type Trailer, type QuoteRequest } from '../api';
 import { showTelegramAlert, setupTelegramMainButton, hideTelegramMainButton } from '../telegram';
 import './TrailerPage.css';
@@ -7,6 +7,7 @@ import './TrailerPage.css';
 const TrailerPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [trailer, setTrailer] = useState<Trailer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,10 +25,21 @@ const TrailerPage: React.FC = () => {
   const [quoteLoading, setQuoteLoading] = useState(false);
 
   useEffect(() => {
+    // Handle Telegram Mini App startapp parameter
+    const startapp = searchParams.get('startapp');
+    if (startapp && startapp.startsWith('trailer_')) {
+      const trailerId = startapp.replace('trailer_', '');
+      // Clean URL by removing startapp parameter
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('startapp');
+      const newUrl = newSearchParams.toString() ? `?${newSearchParams.toString()}` : '';
+      window.history.replaceState({}, '', `/trailer/${trailerId}${newUrl}`);
+    }
+    
     if (id) {
       loadTrailer();
     }
-  }, [id]);
+  }, [id, searchParams]);
 
   useEffect(() => {
     if (showBookingForm && quote && quote.pricing) {
@@ -133,8 +145,10 @@ const TrailerPage: React.FC = () => {
     }
   }, [quote, trailer, bookingData, navigate]);
 
-  const formatDimensions = (dimensions: any) => 
-    `${dimensions.length/1000}м × ${dimensions.width/1000}м × ${dimensions.height/1000}м`;
+  const formatDimensions = (dimensions: any) => {
+    if (!dimensions) return 'Не указано';
+    return `${dimensions.length/1000}м × ${dimensions.width/1000}м × ${dimensions.height/1000}м`;
+  };
 
   const formatWeight = (weight: number) => 
     weight >= 1000 ? `${weight/1000}т` : `${weight}кг`;
@@ -236,20 +250,8 @@ const TrailerPage: React.FC = () => {
               <span className="spec-value">{formatWeight(trailer.capacity)}</span>
             </div>
             <div className="spec-item">
-              <span className="spec-label">Тент:</span>
-              <span className="spec-value">{trailer.hasTent ? '✅ Есть' : '❌ Нет'}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Оси:</span>
-              <span className="spec-value">{trailer.axles}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Тормоз:</span>
-              <span className="spec-value">{trailer.brakeType}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Масса:</span>
-              <span className="spec-value">{formatWeight(trailer.weight)}</span>
+              <span className="spec-label">Особенности:</span>
+              <span className="spec-value">{trailer.features.length > 0 ? trailer.features.join(', ') : 'Нет'}</span>
             </div>
           </div>
         </div>
@@ -258,24 +260,24 @@ const TrailerPage: React.FC = () => {
           <h3>Цены</h3>
           <div className="pricing-grid">
             <div className="price-item">
-              <span className="price-label">Минимум (2 часа):</span>
-              <span className="price-value">{trailer.pricing.minCost}₽</span>
+              <span className="price-label">Минимум ({trailer.minRentalHours} часа):</span>
+              <span className="price-value">{trailer.minRentalPrice}₽</span>
             </div>
             <div className="price-item">
               <span className="price-label">Дополнительный час:</span>
-              <span className="price-value">{trailer.pricing.hourPrice}₽</span>
+              <span className="price-value">{trailer.extraHourPrice}₽</span>
             </div>
             <div className="price-item">
               <span className="price-label">Сутки:</span>
-              <span className="price-value">{trailer.pricing.dayPrice}₽</span>
+              <span className="price-value">{trailer.dailyRate}₽</span>
             </div>
             <div className="price-item">
               <span className="price-label">Залог:</span>
-              <span className="price-value">{trailer.pricing.deposit}₽</span>
+              <span className="price-value">{trailer.depositAmount}₽</span>
             </div>
             <div className="price-item">
               <span className="price-label">Забор прицепа:</span>
-              <span className="price-value">{trailer.pricing.pickupPrice}₽</span>
+              <span className="price-value">{trailer.pickupPrice}₽</span>
             </div>
           </div>
         </div>
@@ -286,8 +288,8 @@ const TrailerPage: React.FC = () => {
             <div className="location-info">
               <h4>{trailer.location.name}</h4>
               <p>{trailer.location.address}</p>
-              <p>Телефон: {trailer.location.phone}</p>
-              <p>Часы работы: {trailer.location.workingHours.open} - {trailer.location.workingHours.close}</p>
+              <p>{trailer.location.city}, {trailer.location.region}</p>
+              {trailer.location.description && <p>{trailer.location.description}</p>}
             </div>
           </div>
         )}
@@ -348,7 +350,7 @@ const TrailerPage: React.FC = () => {
                     checked={bookingData.pickup}
                     onChange={(e) => setBookingData(prev => ({ ...prev, pickup: e.target.checked }))}
                   />
-                  Забор прицепа (+{trailer.pricing.pickupPrice}₽)
+                  Забор прицепа (+{trailer.pickupPrice}₽)
                 </label>
               </div>
 
@@ -372,7 +374,7 @@ const TrailerPage: React.FC = () => {
                       </div>
                     )}
                     <div className="breakdown-total">
-                      <span>Итого к оплате: {quote.pricing.total || 0}₽</span>
+                      <span>Итого к оплате: {(quote.pricing.baseCost + quote.pricing.additionalCost) || 0}₽</span>
                     </div>
                   </div>
                 </div>

@@ -214,14 +214,6 @@ class PhotoComparisonService {
     return this.comparisons.get(comparisonId);
   }
 
-  /**
-   * Get all comparisons for a booking
-   */
-  getBookingComparisons(bookingId: string): PhotoComparisonResult[] {
-    return Array.from(this.comparisons.values())
-      .filter(comparison => comparison.bookingId === bookingId)
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  }
 
   /**
    * Get all comparisons with damage
@@ -296,6 +288,14 @@ class PhotoComparisonService {
       logger.info(`Comparison ${comparisonId} deleted`);
     }
     return deleted;
+  }
+
+  /**
+   * Get all comparisons for a booking
+   */
+  getBookingComparisons(bookingId: string): PhotoComparisonResult[] {
+    const comparisons = Array.from(this.comparisons.values());
+    return comparisons.filter(c => c.bookingId === bookingId);
   }
 
   /**

@@ -82,8 +82,8 @@ const TrailersPage: React.FC = () => {
                   <span className="spec-value">{trailer.capacity} кг</span>
                 </div>
                 <div className="spec-item">
-                  <span className="spec-label">Тент:</span>
-                  <span className="spec-value">{trailer.hasTent ? 'Есть' : 'Нет'}</span>
+                  <span className="spec-label">Особенности:</span>
+                  <span className="spec-value">{trailer.features.join(', ') || 'Нет'}</span>
                 </div>
                 <div className="spec-item">
                   <span className="spec-label">Статус:</span>
@@ -96,19 +96,19 @@ const TrailersPage: React.FC = () => {
               <div className="trailer-pricing">
                 <div className="price-item">
                   <span>Минимум:</span>
-                  <span>{trailer.pricing.minHours}ч = {trailer.pricing.minCost}₽</span>
+                  <span>{trailer.minRentalHours}ч = {trailer.minRentalPrice}₽</span>
                 </div>
                 <div className="price-item">
-                  <span>Час:</span>
-                  <span>{trailer.pricing.hourPrice}₽</span>
+                  <span>Доп. час:</span>
+                  <span>{trailer.extraHourPrice}₽</span>
                 </div>
                 <div className="price-item">
                   <span>Сутки:</span>
-                  <span>{trailer.pricing.dayPrice}₽</span>
+                  <span>{trailer.dailyRate}₽</span>
                 </div>
                 <div className="price-item">
                   <span>Залог:</span>
-                  <span>{trailer.pricing.deposit}₽</span>
+                  <span>{trailer.depositAmount}₽</span>
                 </div>
               </div>
             </div>
@@ -116,7 +116,7 @@ const TrailersPage: React.FC = () => {
             <div className="trailer-actions">
               <button 
                 className="qr-button"
-                onClick={() => setQrGenerator({ type: 'TRAILER', id: trailer.id, name: trailer.name })}
+                onClick={() => setQrGenerator({ type: 'TRAILER', id: trailer.id.toString(), name: trailer.name })}
               >
                 QR-код
               </button>
@@ -128,7 +128,7 @@ const TrailersPage: React.FC = () => {
               </button>
               <button 
                 className="delete-button"
-                onClick={() => handleDeleteTrailer(trailer.id)}
+                onClick={() => handleDeleteTrailer(trailer.id.toString())}
               >
                 Удалить
               </button>

@@ -25,6 +25,8 @@ class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log the error to console
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error('Error stack:', error.stack);
+    console.error('Component stack:', errorInfo.componentStack);
     
     this.setState({
       error,
@@ -51,9 +53,9 @@ class ErrorBoundary extends Component<Props, State> {
               Перезагрузить страницу
             </button>
             
-            {(window as any).process?.env?.NODE_ENV === 'development' && this.state.error && (
+            {this.state.error && (
               <details className="error-details">
-                <summary>Детали ошибки (только для разработки)</summary>
+                <summary>Детали ошибки</summary>
                 <pre>{this.state.error.toString()}</pre>
                 {this.state.errorInfo && (
                   <pre>{this.state.errorInfo.componentStack}</pre>

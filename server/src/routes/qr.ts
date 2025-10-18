@@ -1,6 +1,6 @@
 import express from 'express';
 import { qrService } from '../services/qrService';
-import { locations, trailers } from '../data';
+import { databaseService } from '../services/databaseService';
 import logger from '../utils/logger';
 
 const router = express.Router();
@@ -13,7 +13,7 @@ router.get('/location/:locationId', async (req, res) => {
   try {
     const { locationId } = req.params;
 
-    const location = locations.get(locationId);
+    const location = await databaseService.getLocation(parseInt(locationId));
     if (!location) {
       return res.status(404).json({
         success: false,
@@ -52,7 +52,7 @@ router.get('/trailer/:trailerId', async (req, res) => {
   try {
     const { trailerId } = req.params;
 
-    const trailer = trailers.get(trailerId);
+    const trailer = await databaseService.getTrailer(parseInt(trailerId));
     if (!trailer) {
       return res.status(404).json({
         success: false,
@@ -184,12 +184,13 @@ router.post('/png', async (req, res) => {
  */
 router.get('/locations/all', async (req, res) => {
   try {
-    const locationsList = Array.from(locations.values()).map(loc => ({
-      id: loc.id,
+    const locationsList = await databaseService.getAllLocations();
+    const locationsForQR = locationsList.map(loc => ({
+      id: loc.id.toString(),
       name: loc.name
     }));
 
-    const qrResults = await qrService.generateLocationQRs(locationsList);
+    const qrResults = await qrService.generateLocationQRs(locationsForQR);
 
     res.json({
       success: true,
@@ -212,12 +213,13 @@ router.get('/locations/all', async (req, res) => {
  */
 router.get('/trailers/all', async (req, res) => {
   try {
-    const trailersList = Array.from(trailers.values()).map(trailer => ({
-      id: trailer.id,
+    const trailersList = await databaseService.getAllTrailers();
+    const trailersForQR = trailersList.map(trailer => ({
+      id: trailer.id.toString(),
       name: trailer.name
     }));
 
-    const qrResults = await qrService.generateTrailerQRs(trailersList);
+    const qrResults = await qrService.generateTrailerQRs(trailersForQR);
 
     res.json({
       success: true,
@@ -242,7 +244,7 @@ router.get('/location/:locationId/trailers', async (req, res) => {
   try {
     const { locationId } = req.params;
 
-    const location = locations.get(locationId);
+    const location = await databaseService.getLocation(parseInt(locationId));
     if (!location) {
       return res.status(404).json({
         success: false,
@@ -250,10 +252,11 @@ router.get('/location/:locationId/trailers', async (req, res) => {
       });
     }
 
-    const trailersList = Array.from(trailers.values())
-      .filter(trailer => trailer.locationId === locationId)
+    const allTrailers = await databaseService.getAllTrailers();
+    const trailersList = allTrailers
+      .filter(trailer => trailer.locationId === parseInt(locationId))
       .map(trailer => ({
-        id: trailer.id,
+        id: trailer.id.toString(),
         name: trailer.name
       }));
 

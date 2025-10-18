@@ -8,12 +8,17 @@ services:
       dockerfile: Dockerfile
     container_name: trailer-go-server
     restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=8080
       - JWT_SECRET=${JWT_SECRET}
       - BOT_TOKEN=${BOT_TOKEN}
-      - ALLOW_DEV_AUTH=false
+      - BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+      - ALLOW_DEV_AUTH=${ALLOW_DEV_AUTH:-false}
       - TINKOFF_TERMINAL_KEY=${TINKOFF_TERMINAL_KEY}
       - TINKOFF_SECRET_KEY=${TINKOFF_SECRET_KEY}
       - TINKOFF_SANDBOX=${TINKOFF_SANDBOX:-true}
@@ -21,6 +26,7 @@ services:
       - BACKEND_URL=${BACKEND_URL:-https://api.beripritsep.ru}
       - UPLOAD_PATH=/app/uploads
       - MAX_FILE_SIZE=10485760
+      - DATABASE_URL=${DATABASE_URL:-postgresql://beripritsep:beripritsep123@postgres:5432/beripritsep?schema=public}
     volumes:
       - ./server/uploads:/app/uploads
       - ./server/logs:/app/logs
@@ -38,6 +44,8 @@ services:
         - VITE_API_URL=https://api.beripritsep.ru
     container_name: trailer-go-web
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - VITE_API_URL=${BACKEND_URL:-https://api.beripritsep.ru}
       - VITE_TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
@@ -52,11 +60,11 @@ services:
       context: ./admin
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=https://api.beripritsep.ru
+        - VITE_API_URL=https://api.beripritsep.ru/api
     container_name: trailer-go-admin
     restart: unless-stopped
     environment:
-      - VITE_API_URL=${BACKEND_URL:-https://api.beripritsep.ru}
+      - VITE_API_URL=https://api.beripritsep.ru/api
     ports:
       - "3001:80"
     networks:
@@ -81,6 +89,22 @@ services:
     networks:
       - trailer-network
 
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: trailer-go-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: beripritsep
+      POSTGRES_USER: beripritsep
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beripritsep123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - trailer-network
+    ports:
+      - "5432:5432"
+
 networks:
   trailer-network:
     driver: bridge
@@ -88,3 +112,4 @@ networks:
 volumes:
   uploads:
   logs:
+  postgres_data:

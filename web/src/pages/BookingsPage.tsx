@@ -179,11 +179,11 @@ const BookingsPage: React.FC = () => {
               <div className="booking-pricing">
                 <div className="price-row">
                   <span className="label">Стоимость:</span>
-                  <span className="value">{booking.pricing.total}₽</span>
+                  <span className="value">{(booking.pricing.baseCost + booking.pricing.additionalCost)}₽</span>
                 </div>
                 <div className="price-row">
                   <span className="label">Залог:</span>
-                  <span className="value">{booking.pricing.deposit}₽</span>
+                  <span className="value deposit">{booking.pricing.deposit}₽</span>
                 </div>
               </div>
 

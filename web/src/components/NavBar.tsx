@@ -17,6 +17,10 @@ const NavBar: React.FC = () => {
         <span className="nav-icon">👤</span>
         <span className="nav-label">Профиль</span>
       </NavLink>
+      <NavLink to="/support" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+        <span className="nav-icon">💬</span>
+        <span className="nav-label">Поддержка</span>
+      </NavLink>
     </nav>
   );
 };

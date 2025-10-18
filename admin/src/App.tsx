@@ -1,24 +1,59 @@
 import React, { useState } from 'react';
+import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
+import LoginForm from './components/LoginForm';
 import Dashboard from './pages/Dashboard';
-import TrailersPage from './pages/TrailersPage';
+import Trailers from './pages/Trailers';
 import LocationsPage from './pages/LocationsPage';
 import UsersPage from './pages/UsersPage';
 import BookingsPage from './pages/BookingsPage';
 import TransactionsPage from './pages/TransactionsPage';
 import PhotoComparisonsPage from './pages/PhotoComparisonsPage';
+import SupportPage from './pages/SupportPage';
 import './App.css';
 
-type Page = 'dashboard' | 'trailers' | 'locations' | 'users' | 'bookings' | 'transactions' | 'photo-comparisons';
+type Page = 'dashboard' | 'trailers' | 'locations' | 'users' | 'bookings' | 'transactions' | 'photo-comparisons' | 'support';
 
-const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+const AdminApp: React.FC = () => {
+  const { admin, login, logout, loading, error } = useAdminAuth();
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    // Restore page from localStorage on app load
+    const savedPage = localStorage.getItem('admin-current-page') as Page;
+    return savedPage || 'dashboard';
+  });
+
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      await login(email, password);
+    } catch (err) {
+      // Error is handled by the context
+    }
+  };
+
+  const handlePageChange = (page: Page) => {
+    setCurrentPage(page);
+    // Save current page to localStorage
+    localStorage.setItem('admin-current-page', page);
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Загрузка...</p>
+      </div>
+    );
+  }
+
+  if (!admin) {
+    return <LoginForm onLogin={handleLogin} loading={loading} error={error || undefined} />;
+  }
 
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onNavigate={handlePageChange} />;
       case 'trailers':
-        return <TrailersPage />;
+        return <Trailers />;
       case 'locations':
         return <LocationsPage />;
       case 'users':
@@ -29,8 +64,10 @@ const App: React.FC = () => {
         return <TransactionsPage />;
       case 'photo-comparisons':
         return <PhotoComparisonsPage />;
+      case 'support':
+        return <SupportPage />;
       default:
-        return <Dashboard />;
+        return <Dashboard onNavigate={handlePageChange} />;
     }
   };
 
@@ -50,6 +87,8 @@ const App: React.FC = () => {
         return 'Управление транзакциями';
       case 'photo-comparisons':
         return 'Сравнение фото';
+      case 'support':
+        return 'Чат поддержки';
       default:
         return 'Панель управления';
     }
@@ -66,7 +105,7 @@ const App: React.FC = () => {
         <ul className="sidebar-menu">
           <li 
             className={currentPage === 'dashboard' ? 'active' : ''}
-            onClick={() => setCurrentPage('dashboard')}
+            onClick={() => handlePageChange('dashboard')}
           >
             <span className="menu-icon">📊</span>
             <span className="menu-text">Панель управления</span>
@@ -74,7 +113,7 @@ const App: React.FC = () => {
           
           <li 
             className={currentPage === 'trailers' ? 'active' : ''}
-            onClick={() => setCurrentPage('trailers')}
+            onClick={() => handlePageChange('trailers')}
           >
             <span className="menu-icon">🚛</span>
             <span className="menu-text">Прицепы</span>
@@ -82,7 +121,7 @@ const App: React.FC = () => {
           
           <li 
             className={currentPage === 'locations' ? 'active' : ''}
-            onClick={() => setCurrentPage('locations')}
+            onClick={() => handlePageChange('locations')}
           >
             <span className="menu-icon">📍</span>
             <span className="menu-text">Локации</span>
@@ -90,7 +129,7 @@ const App: React.FC = () => {
           
           <li 
             className={currentPage === 'users' ? 'active' : ''}
-            onClick={() => setCurrentPage('users')}
+            onClick={() => handlePageChange('users')}
           >
             <span className="menu-icon">👥</span>
             <span className="menu-text">Пользователи</span>
@@ -98,7 +137,7 @@ const App: React.FC = () => {
           
           <li 
             className={currentPage === 'bookings' ? 'active' : ''}
-            onClick={() => setCurrentPage('bookings')}
+            onClick={() => handlePageChange('bookings')}
           >
             <span className="menu-icon">📅</span>
             <span className="menu-text">Бронирования</span>
@@ -106,7 +145,7 @@ const App: React.FC = () => {
           
           <li 
             className={currentPage === 'transactions' ? 'active' : ''}
-            onClick={() => setCurrentPage('transactions')}
+            onClick={() => handlePageChange('transactions')}
           >
             <span className="menu-icon">💳</span>
             <span className="menu-text">Транзакции</span>
@@ -114,10 +153,18 @@ const App: React.FC = () => {
           
           <li 
             className={currentPage === 'photo-comparisons' ? 'active' : ''}
-            onClick={() => setCurrentPage('photo-comparisons')}
+            onClick={() => handlePageChange('photo-comparisons')}
           >
             <span className="menu-icon">📸</span>
             <span className="menu-text">Сравнение фото</span>
+          </li>
+          
+          <li 
+            className={currentPage === 'support' ? 'active' : ''}
+            onClick={() => handlePageChange('support')}
+          >
+            <span className="menu-icon">💬</span>
+            <span className="menu-text">Поддержка</span>
           </li>
         </ul>
         
@@ -125,8 +172,8 @@ const App: React.FC = () => {
           <div className="user-info">
             <div className="user-avatar">👨‍💼</div>
             <div className="user-details">
-              <p className="user-name">Администратор</p>
-              <p className="user-role">Admin</p>
+              <p className="user-name">{admin.firstName} {admin.lastName}</p>
+              <p className="user-role">{admin.role}</p>
             </div>
           </div>
         </div>
@@ -144,7 +191,7 @@ const App: React.FC = () => {
               <span className="button-icon">⚙️</span>
               <span className="button-text">Настройки</span>
             </button>
-            <button className="header-button logout">
+            <button className="header-button logout" onClick={logout}>
               <span className="button-icon">🚪</span>
               <span className="button-text">Выйти</span>
             </button>
@@ -156,6 +203,14 @@ const App: React.FC = () => {
         </div>
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AdminAuthProvider>
+      <AdminApp />
+    </AdminAuthProvider>
   );
 };
 

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { adminApi } from '../api';
+import { useAdminAuth } from '../contexts/AdminAuthContext';
 import './Dashboard.css';
 
 interface DashboardStats {
@@ -27,21 +29,40 @@ const mockStats: DashboardStats = {
   totalTransactions: 234
 };
 
-const Dashboard: React.FC = () => {
+type Page = 'dashboard' | 'trailers' | 'locations' | 'users' | 'bookings' | 'transactions' | 'photo-comparisons' | 'support';
+
+interface DashboardProps {
+  onNavigate: (page: Page) => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+  const { token } = useAdminAuth();
   const [stats, setStats] = useState<DashboardStats>(mockStats);
   const [loading, setLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (token) {
+      loadDashboardData();
+    }
+  }, [token]);
 
   const loadDashboardData = async () => {
+    if (!token) return;
+    
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setStats(mockStats);
+      
+      // Load real stats from API
+      const statsResponse = await adminApi.getStats(token);
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data);
+      } else {
+        // Fallback to mock data if API fails
+        setStats(mockStats);
+      }
+      
+      // Mock recent activity for now
       setRecentActivity([
         { type: 'booking', message: 'Новое бронирование #booking_3', time: '2 минуты назад' },
         { type: 'payment', message: 'Оплата получена: 1,200₽', time: '5 минут назад' },
@@ -51,6 +72,8 @@ const Dashboard: React.FC = () => {
       ]);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      // Fallback to mock data
+      setStats(mockStats);
     } finally {
       setLoading(false);
     }
@@ -171,7 +194,7 @@ const Dashboard: React.FC = () => {
         <div className="quick-actions">
           <h2>Быстрые действия</h2>
           <div className="actions-grid">
-            <button className="action-button" onClick={() => window.location.href = '/admin/trailers'}>
+            <button className="action-button" onClick={() => onNavigate('trailers')}>
               <div className="action-icon">🚛</div>
               <div className="action-text">
                 <h4>Управление прицепами</h4>
@@ -179,7 +202,7 @@ const Dashboard: React.FC = () => {
               </div>
             </button>
 
-            <button className="action-button" onClick={() => window.location.href = '/admin/locations'}>
+            <button className="action-button" onClick={() => onNavigate('locations')}>
               <div className="action-icon">📍</div>
               <div className="action-text">
                 <h4>Управление локациями</h4>
@@ -187,7 +210,7 @@ const Dashboard: React.FC = () => {
               </div>
             </button>
 
-            <button className="action-button" onClick={() => window.location.href = '/admin/users'}>
+            <button className="action-button" onClick={() => onNavigate('users')}>
               <div className="action-icon">👥</div>
               <div className="action-text">
                 <h4>Верификация пользователей</h4>
@@ -195,7 +218,7 @@ const Dashboard: React.FC = () => {
               </div>
             </button>
 
-            <button className="action-button" onClick={() => window.location.href = '/admin/bookings'}>
+            <button className="action-button" onClick={() => onNavigate('bookings')}>
               <div className="action-icon">📅</div>
               <div className="action-text">
                 <h4>Управление бронированиями</h4>
@@ -203,7 +226,7 @@ const Dashboard: React.FC = () => {
               </div>
             </button>
 
-            <button className="action-button" onClick={() => window.location.href = '/admin/transactions'}>
+            <button className="action-button" onClick={() => onNavigate('transactions')}>
               <div className="action-icon">💳</div>
               <div className="action-text">
                 <h4>Финансовые операции</h4>
@@ -211,7 +234,7 @@ const Dashboard: React.FC = () => {
               </div>
             </button>
 
-            <button className="action-button" onClick={() => window.location.href = '/admin/photo-comparisons'}>
+            <button className="action-button" onClick={() => onNavigate('photo-comparisons')}>
               <div className="action-icon">📸</div>
               <div className="action-text">
                 <h4>Сравнение фото</h4>
@@ -219,7 +242,7 @@ const Dashboard: React.FC = () => {
               </div>
             </button>
 
-            <button className="action-button" onClick={() => window.location.href = '/admin/support'}>
+            <button className="action-button" onClick={() => onNavigate('support')}>
               <div className="action-icon">💬</div>
               <div className="action-text">
                 <h4>Поддержка</h4>

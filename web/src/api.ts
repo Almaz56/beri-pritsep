@@ -43,26 +43,21 @@ export interface Trailer {
   name: string;
   description: string;
   photos: string[];
-  dimensions: {
+  dimensions?: {
     length: number;
     width: number;
     height: number;
-  };
+  } | null;
   capacity: number;
-  hasTent: boolean;
-  axles: number;
-  brakeType: string;
-  weight: number;
-  locationId: string;
-  location?: Location;
-  pricing: {
-    minHours: number;
-    minCost: number;
-    hourPrice: number;
-    dayPrice: number;
-    deposit: number;
-    pickupPrice: number;
-  };
+  dailyRate: number;
+  minRentalHours: number;
+  minRentalPrice: number;
+  extraHourPrice: number;
+  pickupPrice: number;
+  depositAmount: number;
+  features: string[];
+  locationId: string | null;
+  location?: Location | null;
   status: 'AVAILABLE' | 'RENTED' | 'MAINTENANCE';
   createdAt: string;
   updatedAt: string;
@@ -138,6 +133,33 @@ export interface Booking {
   trailer?: Trailer;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SupportChat {
+  id: number;
+  userId: number;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+  user: User;
+  messages: SupportMessage[];
+  isAdminTyping?: boolean;
+}
+
+export interface SupportMessage {
+  id: number;
+  chatId: number;
+  senderId?: number;
+  senderType: 'USER' | 'ADMIN';
+  content: string;
+  attachments: string[];
+  isRead: boolean;
+  createdAt: string;
+  admin?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 // Auth API
@@ -936,4 +958,115 @@ export const photoComparisonApi = {
       };
     }
   }
+};
+
+// Support Chat API
+export const supportApi = {
+  /**
+   * Create or get support chat
+   */
+  async createSupportChat(token: string, data: {}): Promise<ApiResponse<SupportChat>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/support/chats`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Create support chat error:', error);
+      return {
+        success: false,
+        error: 'Ошибка подключения к серверу'
+      };
+    }
+  },
+
+  /**
+   * Get user's support chat
+   */
+  async getSupportChats(token: string): Promise<ApiResponse<SupportChat>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/support/chats`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Get support chat error:', error);
+      return {
+        success: false,
+        error: 'Ошибка подключения к серверу'
+      };
+    }
+  },
+
+  /**
+   * Get specific support chat
+   */
+  async getSupportChat(chatId: number, token: string): Promise<ApiResponse<SupportChat>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/support/chats/${chatId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Get support chat error:', error);
+      return {
+        success: false,
+        error: 'Ошибка подключения к серверу'
+      };
+    }
+  },
+
+  /**
+   * Send message to support chat
+   */
+  async sendSupportMessage(chatId: number, content: string, attachments: string[], token: string): Promise<ApiResponse<SupportMessage>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/support/chats/${chatId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content, attachments }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Send support message error:', error);
+      return {
+        success: false,
+        error: 'Ошибка подключения к серверу'
+      };
+    }
+  },
 };
