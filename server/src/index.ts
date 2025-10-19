@@ -49,7 +49,7 @@ console.log('  NODE_ENV:', process.env['NODE_ENV']);
 app.use(helmet());
 app.use(cors({
   origin: process.env['NODE_ENV'] === 'production' 
-    ? ['https://beripritsep.ru', 'https://admin.beripritsep.ru']
+    ? ['https://app.beripritsep.ru', 'https://admin.beripritsep.ru']
     : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:3003'],
   credentials: true,
 }));
