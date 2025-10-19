@@ -446,11 +446,20 @@ const SupportPage: React.FC = () => {
       <div className="support-header">
         <div className="header-content">
           <button 
-            className="back-btn" 
             onClick={() => window.history.back()}
             title="Назад"
+            style={{
+              background: 'red',
+              color: 'white',
+              border: '2px solid yellow',
+              padding: '10px',
+              fontSize: '16px',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              marginRight: '10px'
+            }}
           >
-            ←
+            ← НАЗАД
           </button>
           <div>
             <h2>Поддержка</h2>

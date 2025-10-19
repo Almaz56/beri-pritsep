@@ -3,6 +3,7 @@ import { documentService } from '../services/documentService';
 import { documentUploads, documentVerifications } from '../data';
 import { databaseService } from '../services/databaseService';
 import logger from '../utils/logger';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -10,9 +11,10 @@ const router = express.Router();
  * Upload documents for verification
  * POST /api/documents/upload
  */
-router.post('/upload', documentService.getMulterConfig().single('document'), async (req, res) => {
+router.post('/upload', authenticateToken, documentService.getMulterConfig().single('document'), async (req: AuthRequest, res) => {
   try {
-    const { userId, documentType } = req.body;
+    const { documentType } = req.body;
+    const userId = req.user?.id;
 
     if (!userId || !documentType) {
       return res.status(400).json({
@@ -22,7 +24,7 @@ router.post('/upload', documentService.getMulterConfig().single('document'), asy
     }
 
     // Check if user exists
-    const user = await databaseService.getUser(parseInt(userId));
+    const user = await databaseService.getUser(parseInt(userId.toString()));
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -99,9 +101,18 @@ router.post('/upload', documentService.getMulterConfig().single('document'), asy
  * Get user's document verification status
  * GET /api/documents/verification/:userId
  */
-router.get('/verification/:userId', async (req, res) => {
+router.get('/verification/:userId', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { userId } = req.params;
+    const tokenUserId = req.user?.id;
+
+    // Check if user is accessing their own data
+    if (parseInt(userId) !== parseInt(tokenUserId?.toString() || '0')) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
 
     const user = await databaseService.getUser(parseInt(userId));
     if (!user) {
@@ -167,7 +178,7 @@ router.get('/verification/:userId', async (req, res) => {
  * Delete a document
  * DELETE /api/documents/:documentId
  */
-router.delete('/:documentId', async (req, res) => {
+router.delete('/:documentId', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { documentId } = req.params;
 

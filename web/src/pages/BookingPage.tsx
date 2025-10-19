@@ -284,25 +284,40 @@ const BookingPage: React.FC = () => {
           </div>
         )}
 
-        {/* Create Booking Button */}
-        {paymentStep === 'booking' && (
-          <div className="booking-section">
-            <div className="booking-actions">
-              <button
-                className="create-booking-button"
-                onClick={handleConfirmBooking}
-                disabled={loading}
-              >
-                {loading ? 'Создание бронирования...' : 'Создать бронирование'}
-              </button>
-              {error && (
-                <div className="error-message">
-                  {error}
-                </div>
-              )}
+        {/* Create Booking Button - Always Visible for Testing */}
+        <div className="booking-section">
+          <div className="booking-actions">
+            <button
+              onClick={handleConfirmBooking}
+              disabled={loading}
+              style={{
+                background: 'green',
+                color: 'white',
+                border: '3px solid red',
+                padding: '20px',
+                fontSize: '20px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                marginBottom: '20px'
+              }}
+            >
+              {loading ? 'Создание бронирования...' : 'СОЗДАТЬ БРОНИРОВАНИЕ'}
+            </button>
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
+            <div style={{ marginTop: '20px', padding: '10px', background: '#f0f0f0', borderRadius: '8px' }}>
+              <p><strong>Отладка состояния:</strong></p>
+              <p>paymentStep: {paymentStep}</p>
+              <p>loading: {loading.toString()}</p>
+              <p>error: {error || 'нет'}</p>
+              <p>bookingId: {bookingId || 'нет'}</p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Payment Steps */}
         {paymentStep === 'rental' && bookingId && (

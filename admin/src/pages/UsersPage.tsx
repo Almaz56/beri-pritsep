@@ -24,43 +24,7 @@ interface DocumentVerification {
   updatedAt: Date;
 }
 
-const mockUsers: User[] = [
-  {
-    id: 'user_dev_1',
-    telegramId: 123456789,
-    firstName: 'Иван',
-    lastName: 'Петров',
-    username: 'ivan_petrov',
-    phoneNumber: '+7 (900) 123-45-67',
-    phone: '+7 (900) 123-45-67',
-    phoneVerificationStatus: 'VERIFIED',
-    verificationStatus: 'PENDING',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-15')
-  },
-  {
-    id: 'user_2',
-    telegramId: 987654321,
-    firstName: 'Мария',
-    lastName: 'Сидорова',
-    username: 'maria_s',
-    phoneNumber: '+7 (900) 987-65-43',
-    phoneVerificationStatus: 'REQUIRED',
-    verificationStatus: 'PENDING',
-    createdAt: new Date('2024-01-10'),
-    updatedAt: new Date('2024-01-12')
-  }
-];
-
-const mockDocumentVerifications: DocumentVerification[] = [
-  {
-    id: 'docver_1',
-    userId: 'user_dev_1',
-    status: 'PENDING_MODERATION',
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15')
-  }
-];
+// Mock data removed - using real API calls
 
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -77,10 +41,32 @@ const UsersPage: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUsers(mockUsers);
-      setDocumentVerifications(mockDocumentVerifications);
+      
+      // Load users from API
+      const usersResponse = await fetch('/api/admin/users');
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json();
+        if (usersData.success) {
+          setUsers(usersData.data.map((user: any) => ({
+            ...user,
+            createdAt: new Date(user.createdAt),
+            updatedAt: new Date(user.updatedAt)
+          })));
+        }
+      }
+      
+      // Load document verifications from API
+      const docsResponse = await fetch('/api/admin/document-verifications');
+      if (docsResponse.ok) {
+        const docsData = await docsResponse.json();
+        if (docsData.success) {
+          setDocumentVerifications(docsData.data.map((doc: any) => ({
+            ...doc,
+            createdAt: new Date(doc.createdAt),
+            updatedAt: new Date(doc.updatedAt)
+          })));
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
