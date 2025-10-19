@@ -282,6 +282,26 @@ const BookingPage: React.FC = () => {
           </div>
         )}
 
+        {/* Create Booking Button */}
+        {paymentStep === 'booking' && (
+          <div className="booking-section">
+            <div className="booking-actions">
+              <button
+                className="create-booking-button"
+                onClick={handleConfirmBooking}
+                disabled={loading}
+              >
+                {loading ? 'Создание бронирования...' : 'Создать бронирование'}
+              </button>
+              {error && (
+                <div className="error-message">
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Payment Steps */}
         {paymentStep === 'rental' && bookingId && (
           <div className="booking-section">
