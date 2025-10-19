@@ -19,9 +19,9 @@ const PaymentFailedPage: React.FC = () => {
   const handleRetry = () => {
     const bookingId = searchParams.get('bookingId');
     if (bookingId) {
-      navigate(`/booking/${bookingId}`);
+      navigate(`/bookings`);
     } else {
-      navigate('/profile');
+      navigate('/bookings');
     }
   };
 

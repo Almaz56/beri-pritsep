@@ -911,6 +911,43 @@ app.get('/api/payments/:paymentId/status', authenticateToken, async (req: AuthRe
   }
 });
 
+// Get user payments
+app.get('/api/payments/user/:userId', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId } = req.params as { userId: string };
+    
+    if (parseInt(userId) !== req.user?.id!) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+
+    const allPayments = await databaseService.getAllPayments();
+    const userPayments = allPayments.filter(p => p.userId === parseInt(userId));
+
+    res.json({
+      success: true,
+      data: userPayments.map(payment => ({
+        id: payment.id,
+        bookingId: payment.bookingId,
+        amount: payment.amount,
+        type: payment.type,
+        status: payment.status,
+        createdAt: payment.createdAt,
+        updatedAt: payment.updatedAt
+      }))
+    });
+
+  } catch (error) {
+    logger.error('User payments error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Photo upload endpoints
 app.post('/api/photos/upload', authenticateToken, photoService.getMulterConfig().array('photos', 4), async (req: AuthRequest, res: Response) => {
   try {

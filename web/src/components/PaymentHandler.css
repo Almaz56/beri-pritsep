@@ -88,6 +88,43 @@
   text-align: center;
 }
 
+.status-indicator {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.status-indicator.creating {
+  color: #ff9800;
+}
+
+.status-indicator.waiting {
+  color: #2196f3;
+}
+
+.status-indicator.processing {
+  color: #9c27b0;
+}
+
+.status-indicator.completed {
+  color: #4caf50;
+}
+
+.status-indicator.failed {
+  color: #f44336;
+}
+
+.error-message {
+  background: #ffebee;
+  color: #c62828;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  border-left: 3px solid #f44336;
+}
+
 /* Success state */
 .payment-handler.success {
   border-color: #4CAF50;

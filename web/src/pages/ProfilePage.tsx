@@ -12,6 +12,8 @@ const ProfilePage: React.FC = () => {
   const [authenticating, setAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [documentStatus, setDocumentStatus] = useState<any>(null);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -29,6 +31,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (user) {
       checkDocumentStatus();
+      loadPayments();
     }
   }, [user]);
 
@@ -210,6 +213,39 @@ const ProfilePage: React.FC = () => {
       }
     } catch (err) {
       console.error('Document status check error:', err);
+    }
+  };
+
+  const loadPayments = async () => {
+    if (!user) return;
+    
+    const token = getAuthToken();
+    if (!token) return;
+
+    setPaymentsLoading(true);
+    try {
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 
+        (window.location.hostname === 'app.beripritsep.ru' 
+          ? 'https://api.beripritsep.ru/api' 
+          : 'http://localhost:8080/api');
+
+      const response = await fetch(`${API_BASE_URL}/payments/user/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setPayments(result.data);
+        }
+      }
+    } catch (err) {
+      console.error('Payments load error:', err);
+    } finally {
+      setPaymentsLoading(false);
     }
   };
 
@@ -408,6 +444,40 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Payment History */}
+        <div className="profile-section">
+          <h2>История платежей</h2>
+          {paymentsLoading ? (
+            <div className="loading-message">Загрузка платежей...</div>
+          ) : payments.length > 0 ? (
+            <div className="payments-list">
+              {payments.map((payment) => (
+                <div key={payment.id} className="payment-item">
+                  <div className="payment-info">
+                    <div className="payment-type">
+                      {payment.type === 'RENTAL' ? 'Оплата аренды' : 'Залог'}
+                    </div>
+                    <div className="payment-amount">{payment.amount}₽</div>
+                  </div>
+                  <div className="payment-details">
+                    <div className={`payment-status ${payment.status.toLowerCase()}`}>
+                      {payment.status === 'COMPLETED' && '✅ Оплачено'}
+                      {payment.status === 'PENDING' && '⏳ Ожидание'}
+                      {payment.status === 'FAILED' && '❌ Ошибка'}
+                      {payment.status === 'CANCELLED' && '🚫 Отменено'}
+                    </div>
+                    <div className="payment-date">
+                      {new Date(payment.createdAt).toLocaleDateString('ru-RU')}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="no-payments">Платежей пока нет</div>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="profile-section">

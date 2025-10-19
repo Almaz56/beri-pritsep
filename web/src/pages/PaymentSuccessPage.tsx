@@ -25,9 +25,9 @@ const PaymentSuccessPage: React.FC = () => {
   const handleViewBooking = () => {
     const bookingId = searchParams.get('bookingId');
     if (bookingId) {
-      navigate(`/booking/${bookingId}`);
+      navigate(`/bookings`);
     } else {
-      navigate('/profile');
+      navigate('/bookings');
     }
   };
 
@@ -74,7 +74,7 @@ const PaymentSuccessPage: React.FC = () => {
             className="primary-button"
             onClick={handleViewBooking}
           >
-            Посмотреть бронирование
+            Мои бронирования
           </button>
           
           <button

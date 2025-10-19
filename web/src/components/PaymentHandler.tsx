@@ -30,6 +30,8 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'creating' | 'waiting' | 'processing' | 'completed' | 'failed'>('idle');
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 
@@ -66,11 +68,14 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
   const handlePayment = async () => {
     try {
       setLoading(true);
+      setError(null);
+      setPaymentStatus('creating');
       
       const result = await createPayment();
       
       if (result.success && result.data) {
         setPaymentUrl(result.data.paymentUrl);
+        setPaymentStatus('waiting');
         
         // Open payment URL in new window
         const paymentWindow = window.open(
@@ -83,15 +88,20 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
           throw new Error('Не удалось открыть окно оплаты. Проверьте блокировщик всплывающих окон.');
         }
 
+        setPaymentStatus('processing');
+
         // Monitor payment window
         const checkPaymentStatus = setInterval(async () => {
           try {
             if (paymentWindow.closed) {
               clearInterval(checkPaymentStatus);
+              setPaymentStatus('processing');
               await checkPaymentResult(result.data!.paymentId);
             }
           } catch (error) {
             console.error('Error checking payment status:', error);
+            setError('Ошибка проверки статуса платежа');
+            setPaymentStatus('failed');
           }
         }, 2000);
 
@@ -100,6 +110,8 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
           if (!paymentWindow.closed) {
             paymentWindow.close();
             clearInterval(checkPaymentStatus);
+            setError('Время ожидания оплаты истекло');
+            setPaymentStatus('failed');
             showTelegramAlert('Время ожидания оплаты истекло');
             onError?.('Время ожидания оплаты истекло');
           }
@@ -111,6 +123,8 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
     } catch (error) {
       console.error('Payment error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Ошибка обработки платежа';
+      setError(errorMessage);
+      setPaymentStatus('failed');
       showTelegramAlert(errorMessage);
       onError?.(errorMessage);
     } finally {
@@ -137,13 +151,17 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
         const status = result.data.status;
         
         if (status === 'COMPLETED') {
+          setPaymentStatus('completed');
           showTelegramAlert('Платеж успешно обработан!');
           onSuccess?.();
         } else if (status === 'FAILED' || status === 'CANCELLED') {
+          setPaymentStatus('failed');
+          setError('Платеж не был завершен');
           showTelegramAlert('Платеж не был завершен');
           onError?.('Платеж не был завершен');
         } else {
           // Still processing
+          setPaymentStatus('processing');
           setTimeout(() => checkPaymentResult(paymentId), 3000);
         }
       } else {
@@ -152,6 +170,8 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
     } catch (error) {
       console.error('Payment status check error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Ошибка проверки платежа';
+      setError(errorMessage);
+      setPaymentStatus('failed');
       showTelegramAlert(errorMessage);
       onError?.(errorMessage);
     }
@@ -194,11 +214,33 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
         <button
           className="payment-button"
           onClick={handlePayment}
-          disabled={loading}
+          disabled={loading || paymentStatus === 'completed'}
         >
-          {loading ? 'Обработка...' : 'Оплатить'}
+          {loading ? 'Обработка...' : 
+           paymentStatus === 'completed' ? 'Оплачено' :
+           paymentStatus === 'failed' ? 'Повторить' :
+           paymentStatus === 'processing' ? 'Обработка платежа...' :
+           paymentStatus === 'waiting' ? 'Ожидание оплаты...' :
+           'Оплатить'}
         </button>
       </div>
+
+      {paymentStatus !== 'idle' && (
+        <div className="payment-status">
+          <div className={`status-indicator ${paymentStatus}`}>
+            {paymentStatus === 'creating' && '🔄 Создание платежа...'}
+            {paymentStatus === 'waiting' && '⏳ Ожидание оплаты...'}
+            {paymentStatus === 'processing' && '🔄 Обработка платежа...'}
+            {paymentStatus === 'completed' && '✅ Платеж успешно обработан!'}
+            {paymentStatus === 'failed' && '❌ Ошибка платежа'}
+          </div>
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
+        </div>
+      )}
 
       {paymentUrl && (
         <div className="payment-status">

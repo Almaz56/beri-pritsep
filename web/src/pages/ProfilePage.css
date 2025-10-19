@@ -338,6 +338,93 @@
   background-color: #d32f2f;
 }
 
+/* Payment History Styles */
+.payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-item {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.payment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payment-type {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.payment-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2e7d32;
+}
+
+.payment-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.payment-status {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.payment-status.completed {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.payment-status.pending {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.payment-status.failed {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.payment-status.cancelled {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.payment-date {
+  font-size: 12px;
+  color: #666;
+}
+
+.no-payments {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 20px;
+}
+
+.loading-message {
+  text-align: center;
+  color: #666;
+  padding: 20px;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .profile-page {
