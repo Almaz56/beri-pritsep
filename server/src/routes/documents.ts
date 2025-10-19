@@ -13,6 +13,12 @@ const router = express.Router();
  */
 router.post('/upload', authenticateToken, documentService.getMulterConfig().single('document'), async (req: AuthRequest, res) => {
   try {
+    logger.info('Document upload request received:', { 
+      userId: req.user?.id, 
+      documentType: req.body.documentType,
+      hasFile: !!req.file 
+    });
+    
     const { documentType } = req.body;
     const userId = req.user?.id;
 

@@ -105,7 +105,6 @@ const DocumentUploadPage: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('document', selectedFile);
-      formData.append('userId', userId);
       formData.append('documentType', selectedDocumentType);
 
       const response = await documentsApi.uploadDocument(formData, token);
