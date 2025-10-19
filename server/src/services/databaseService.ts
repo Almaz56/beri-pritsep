@@ -556,6 +556,12 @@ export class DatabaseService {
       unreadMessages
     };
   }
+
+  async getUser(userId: number): Promise<User | null> {
+    return await prisma.user.findUnique({
+      where: { id: userId }
+    });
+  }
 }
 
 export const databaseService = new DatabaseService();

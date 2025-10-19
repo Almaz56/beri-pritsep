@@ -8,6 +8,14 @@
   position: relative;
 }
 
+/* Ensure NavBar is always visible in support page */
+.support-page + .navbar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 1000 !important;
+}
+
 .support-header {
   background: #2481cc;
   color: white;
@@ -27,6 +35,26 @@
 
 .header-content > div {
   flex: 1;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .refresh-btn {
@@ -607,9 +635,11 @@ body.hide-navigation .message-input-fixed {
   bottom: 0px !important;
 }
 
-/* Additional styles to ensure navigation is hidden */
-body.hide-navigation * {
-  /* This will help hide any navigation elements */
+/* Ensure NavBar is always visible */
+body.hide-navigation .navbar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Ensure input is always visible when focused */
@@ -631,6 +661,13 @@ body.hide-navigation * {
     bottom: 0px !important;
     position: fixed !important;
     z-index: 99999 !important;
+  }
+  
+  /* Ensure NavBar is always visible on iOS */
+  body.hide-navigation .navbar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   
   /* iOS Safari specific fixes */

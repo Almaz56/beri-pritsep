@@ -445,6 +445,13 @@ const SupportPage: React.FC = () => {
     <div className="support-page">
       <div className="support-header">
         <div className="header-content">
+          <button 
+            className="back-btn" 
+            onClick={() => window.history.back()}
+            title="Назад"
+          >
+            ←
+          </button>
           <div>
             <h2>Поддержка</h2>
             <p>Мы всегда готовы помочь <span className="online-indicator">🟢</span></p>

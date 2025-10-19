@@ -317,8 +317,7 @@ const SupportPage: React.FC = () => {
               m.id === tempMessage.id ? { 
                 ...m, 
                 id: response.data!.id, 
-                createdAt: response.data!.createdAt,
-                updatedAt: response.data!.updatedAt
+                createdAt: response.data!.createdAt
               } : m
             ) || []
           };
