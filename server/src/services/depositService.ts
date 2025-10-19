@@ -28,7 +28,7 @@ class DepositService {
       logger.info(`Processing deposit refund for booking ${bookingId}`);
 
       // Get booking details
-      const booking = await databaseService.getBooking(bookingId);
+      const booking = await databaseService.getBooking(parseInt(bookingId));
       if (!booking) {
         logger.error(`Booking ${bookingId} not found`);
         return null;
@@ -37,7 +37,7 @@ class DepositService {
       // Get deposit payment
       const allPayments = await databaseService.getAllPayments();
       const depositPayment = allPayments.find(p => 
-        p.bookingId === bookingId && 
+        p.bookingId === parseInt(bookingId) && 
         p.type === 'DEPOSIT_HOLD' && 
         p.status === 'COMPLETED'
       );
@@ -61,8 +61,8 @@ class DepositService {
       // Create refund record
       const refund: DepositRefund = {
         id: `refund_${Date.now()}`,
-        bookingId,
-        userId: booking.userId,
+        bookingId: bookingId,
+        userId: booking.userId.toString(),
         originalPaymentId: depositPayment.paymentId,
         refundAmount: damageAnalysis.refundAmount,
         refundType: damageAnalysis.refundType,
@@ -175,10 +175,10 @@ class DepositService {
         refund.completedAt = new Date();
         
         // Update booking status
-        const booking = await databaseService.getBooking(refund.bookingId);
+        const booking = await databaseService.getBooking(parseInt(refund.bookingId));
         if (booking) {
-          booking.status = 'COMPLETED';
-          booking.updatedAt = new Date();
+          (booking as any).status = 'COMPLETED';
+          (booking as any).updatedAt = new Date();
         }
 
         logger.info(`Full refund completed for booking ${refund.bookingId}: ${refund.refundAmount}₽`);
@@ -207,10 +207,10 @@ class DepositService {
         refund.completedAt = new Date();
         
         // Update booking status
-        const booking = await databaseService.getBooking(refund.bookingId);
+        const booking = await databaseService.getBooking(parseInt(refund.bookingId));
         if (booking) {
-          booking.status = 'COMPLETED';
-          booking.updatedAt = new Date();
+          (booking as any).status = 'COMPLETED';
+          (booking as any).updatedAt = new Date();
         }
 
         logger.info(`Partial refund completed for booking ${refund.bookingId}: ${refund.refundAmount}₽ (damage: ${refund.damageAmount}₽)`);
@@ -239,10 +239,10 @@ class DepositService {
         refund.completedAt = new Date();
         
         // Update booking status
-        const booking = await databaseService.getBooking(refund.bookingId);
+        const booking = await databaseService.getBooking(parseInt(refund.bookingId));
         if (booking) {
-          booking.status = 'COMPLETED';
-          booking.updatedAt = new Date();
+          (booking as any).status = 'COMPLETED';
+          (booking as any).updatedAt = new Date();
         }
 
         logger.info(`No refund processed for booking ${refund.bookingId} - deposit retained due to damage: ${refund.damageAmount}₽`);

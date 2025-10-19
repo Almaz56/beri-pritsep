@@ -30,6 +30,8 @@ import { databaseService } from './services/databaseService';
 import { adminService } from './services/adminService';
 import { authenticateAdmin, AdminRequest, requireAdmin } from './middleware/adminAuth';
 import { telegramBotService } from './bot/telegramBot';
+import { bookings, photoChecks, photoUploads } from './data';
+import { photoComparisonService } from './services/photoComparisonService';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -750,7 +752,7 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
       DATA: {
         bookingId,
         paymentType,
-        userId: user.id
+        userId: user.id.toString()
       }
     };
 
@@ -873,7 +875,7 @@ app.get('/api/payments/:paymentId/status', authenticateToken, async (req: AuthRe
       });
     }
 
-    if (payment.userId !== req.user?.id!) {
+    if (payment.userId !== parseInt(req.user?.id!)) {
       return res.status(403).json({
         success: false,
         error: 'Access denied'
@@ -916,7 +918,7 @@ app.get('/api/payments/user/:userId', authenticateToken, async (req: AuthRequest
   try {
     const { userId } = req.params as { userId: string };
     
-    if (parseInt(userId) !== req.user?.id!) {
+    if (parseInt(userId) !== parseInt(req.user?.id!)) {
       return res.status(403).json({
         success: false,
         error: 'Access denied'
@@ -1010,15 +1012,15 @@ app.post('/api/photos/upload', authenticateToken, photoService.getMulterConfig()
 
     // Create or update photo check
     const existingCheck = Array.from(photoChecks.values())
-      .find(check => check.bookingId === bookingId && check.type === type);
+      .find(check => (check as any).bookingId === bookingId && (check as any).type === type);
 
     let photoCheck;
     if (existingCheck) {
       // Update existing check
       photoUploads.forEach(photo => {
-        existingCheck.photos[photo.side] = photo;
+        (existingCheck as any).photos[photo.side] = photo;
       });
-      existingCheck.updatedAt = new Date();
+      (existingCheck as any).updatedAt = new Date();
       photoCheck = existingCheck;
     } else {
       // Create new check
@@ -1100,7 +1102,7 @@ app.get('/api/photos/check/:bookingId/:type', authenticateToken, async (req: Aut
     }
 
     const photoCheck = Array.from(photoChecks.values())
-      .find(check => check.bookingId === bookingId && check.type === type);
+      .find(check => (check as any).bookingId === bookingId && (check as any).type === type);
 
     if (!photoCheck) {
       return res.json({
@@ -1113,30 +1115,30 @@ app.get('/api/photos/check/:bookingId/:type', authenticateToken, async (req: Aut
       });
     }
 
-    const photos = Object.entries(photoCheck.photos).map(([side, photo]) => ({
+    const photos = Object.entries((photoCheck as any).photos).map(([side, photo]) => ({
       side,
-      id: photo?.id,
-      filename: photo?.filename,
-      url: photo ? photoService.getPhotoUrl(photo.filename) : null,
-      uploadedAt: photo?.uploadedAt
+      id: (photo as any)?.id,
+      filename: (photo as any)?.filename,
+      url: photo ? photoService.getPhotoUrl((photo as any).filename) : null,
+      uploadedAt: (photo as any)?.uploadedAt
     }));
 
     const validation = photoService.validatePhotoCheck(
-      Object.values(photoCheck.photos).filter(Boolean) as any[]
+      Object.values((photoCheck as any).photos).filter(Boolean) as any[]
     );
 
     res.json({
       success: true,
       data: {
-        photoCheckId: photoCheck.id,
-        status: photoCheck.status,
+        photoCheckId: (photoCheck as any).id,
+        status: (photoCheck as any).status,
         photos: photos.reduce((acc, photo) => {
           acc[photo.side] = photo;
           return acc;
         }, {} as any),
         missing: validation.valid ? [] : validation.missing,
-        createdAt: photoCheck.createdAt,
-        updatedAt: photoCheck.updatedAt
+        createdAt: (photoCheck as any).createdAt,
+        updatedAt: (photoCheck as any).updatedAt
       }
     });
 
@@ -1180,15 +1182,15 @@ app.delete('/api/photos/:photoId', authenticateToken, async (req: AuthRequest, r
 
     // Update photo check
     const photoCheck = Array.from(photoChecks.values())
-      .find(check => check.bookingId === photo.bookingId && check.type === photo.type);
+      .find(check => (check as any).bookingId === photo.bookingId && (check as any).type === photo.type);
 
-    if (photoCheck && photoCheck.photos[photo.side]) {
-      delete photoCheck.photos[photo.side];
-      photoCheck.updatedAt = new Date();
+    if (photoCheck && (photoCheck as any).photos[photo.side]) {
+      delete (photoCheck as any).photos[photo.side];
+      (photoCheck as any).updatedAt = new Date();
       
-      const remainingPhotos = Object.values(photoCheck.photos).filter(Boolean);
+      const remainingPhotos = Object.values((photoCheck as any).photos).filter(Boolean);
       const validation = photoService.validatePhotoCheck(remainingPhotos as any[]);
-      photoCheck.status = validation.valid ? 'COMPLETED' : 'MISSING';
+      (photoCheck as any).status = validation.valid ? 'COMPLETED' : 'MISSING';
     }
 
     logger.info('Photo deleted:', { photoId, filename: photo.filename });
@@ -1646,8 +1648,8 @@ app.get('/api/deposits/refund/:bookingId', authenticateToken, async (req: AuthRe
     const { bookingId } = req.params as { bookingId: string };
     
     // Check if user owns this booking
-    const booking = await databaseService.getBooking(bookingId);
-    if (!booking || booking.userId !== req.user?.id!) {
+    const booking = await databaseService.getBooking(parseInt(bookingId));
+    if (!booking || booking.userId !== parseInt(req.user?.id!)) {
       return res.status(403).json({
         success: false,
         error: 'Access denied'

@@ -1339,6 +1339,9 @@ app.post('/api/support/chats/:id/messages', authenticateToken, async (req: any, 
 });
 
 // Routes
+app.use('/api/documents', documentRoutes);
+app.use('/api/phone', phoneRoutes);
+app.use('/api/photo-comparison', photoComparisonRoutes);
 app.use('/api/qr', qrRoutes);
 
 initializeServer();
