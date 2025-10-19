@@ -29,7 +29,9 @@ const BookingPage: React.FC = () => {
   const state = location.state as BookingState;
 
   useEffect(() => {
+    console.log('BookingPage state:', state);
     if (!state || !state.trailer || !state.bookingData || !state.quote) {
+      console.error('Missing state data:', { state, trailer: state?.trailer, bookingData: state?.bookingData, quote: state?.quote });
       showTelegramAlert('Ошибка: данные бронирования не найдены');
       navigate('/');
       return;
@@ -306,6 +308,12 @@ const BookingPage: React.FC = () => {
         {paymentStep === 'rental' && bookingId && (
           <div className="booking-section">
             <h2>Оплата аренды</h2>
+            <div style={{ marginBottom: '16px', padding: '12px', background: '#f0f0f0', borderRadius: '8px' }}>
+              <p><strong>Отладка:</strong></p>
+              <p>paymentStep: {paymentStep}</p>
+              <p>bookingId: {bookingId}</p>
+              <p>amount: {state.quote?.pricing?.baseCost + state.quote?.pricing?.additionalCost}</p>
+            </div>
             <PaymentHandler
               bookingId={bookingId}
               amount={state.quote.pricing.baseCost + state.quote.pricing.additionalCost}
