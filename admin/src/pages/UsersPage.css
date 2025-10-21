@@ -29,10 +29,40 @@
   font-weight: 600;
 }
 
+.header-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
 .filter-controls {
   display: flex;
   gap: 15px;
   align-items: center;
+}
+
+.refresh-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.refresh-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
 }
 
 .filter-select {

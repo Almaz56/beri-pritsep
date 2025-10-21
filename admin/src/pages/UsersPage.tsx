@@ -74,21 +74,45 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  const handleVerifyUser = (userId: string, status: 'VERIFIED' | 'REJECTED', comment?: string) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, verificationStatus: status, updatedAt: new Date() }
-        : user
-    ));
-    
-    // Update document verification
-    setDocumentVerifications(documentVerifications.map(dv =>
-      dv.userId === userId
-        ? { ...dv, status: status === 'VERIFIED' ? 'APPROVED' : 'REJECTED', moderatorComment: comment, updatedAt: new Date() }
-        : dv
-    ));
-    
-    alert(`Пользователь ${status === 'VERIFIED' ? 'верифицирован' : 'отклонен'} (mock)`);
+  const handleVerifyUser = async (userId: string, status: 'VERIFIED' | 'REJECTED', comment?: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/verify`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('admin-token')}`
+        },
+        body: JSON.stringify({ status, comment })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // Update local state
+          setUsers(users.map(user => 
+            user.id === userId 
+              ? { ...user, verificationStatus: status, updatedAt: new Date() }
+              : user
+          ));
+          
+          // Update document verification
+          setDocumentVerifications(documentVerifications.map(dv =>
+            dv.userId === userId
+              ? { ...dv, status: status === 'VERIFIED' ? 'APPROVED' : 'REJECTED', moderatorComment: comment, updatedAt: new Date() }
+              : dv
+          ));
+          
+          alert(`Пользователь ${status === 'VERIFIED' ? 'верифицирован' : 'отклонен'} успешно`);
+        } else {
+          alert(`Ошибка: ${result.error}`);
+        }
+      } else {
+        alert('Ошибка при обновлении статуса пользователя');
+      }
+    } catch (error) {
+      console.error('Error verifying user:', error);
+      alert('Ошибка при обновлении статуса пользователя');
+    }
   };
 
   const handleViewDocuments = (user: User) => {
@@ -135,17 +159,26 @@ const UsersPage: React.FC = () => {
     <div className="admin-users-page">
       <div className="page-header">
         <h2>Управление пользователями</h2>
-        <div className="filter-controls">
-          <select 
-            value={filter} 
-            onChange={(e) => setFilter(e.target.value as any)}
-            className="filter-select"
+        <div className="header-controls">
+          <div className="filter-controls">
+            <select 
+              value={filter} 
+              onChange={(e) => setFilter(e.target.value as any)}
+              className="filter-select"
+            >
+              <option value="ALL">Все пользователи</option>
+              <option value="PENDING">Ожидают проверки</option>
+              <option value="VERIFIED">Подтверждены</option>
+              <option value="REJECTED">Отклонены</option>
+            </select>
+          </div>
+          <button 
+            className="refresh-button"
+            onClick={loadData}
+            disabled={loading}
           >
-            <option value="ALL">Все пользователи</option>
-            <option value="PENDING">Ожидают проверки</option>
-            <option value="VERIFIED">Подтверждены</option>
-            <option value="REJECTED">Отклонены</option>
-          </select>
+            {loading ? '🔄' : '🔄'} Обновить
+          </button>
         </div>
       </div>
 

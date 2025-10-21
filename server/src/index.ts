@@ -1623,6 +1623,93 @@ app.get('/api/admin/payments', authenticateAdmin, requireAdmin, async (req: Admi
   }
 });
 
+// User management endpoints
+app.put('/api/admin/users/:userId/verify', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { status, comment } = req.body;
+    
+    if (!status || !['VERIFIED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status. Must be VERIFIED or REJECTED'
+      });
+    }
+    
+    const user = await databaseService.updateVerificationStatus(
+      parseInt(userId), 
+      status as any, 
+      comment
+    );
+    
+    res.json({
+      success: true,
+      data: user,
+      message: `User ${status === 'VERIFIED' ? 'verified' : 'rejected'} successfully`
+    });
+  } catch (error) {
+    logger.error('Admin user verification error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/admin/users/:userId', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const user = await databaseService.getUser(parseInt(userId));
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user,
+      message: 'User retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Admin get user error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+app.get('/api/admin/document-verifications', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    // Get all users with their verification documents
+    const users = await databaseService.getAllUsers();
+    const verifications = users.map(user => ({
+      id: `verification-${user.id}`,
+      userId: user.id.toString(),
+      status: user.verificationStatus === 'PENDING' ? 'PENDING_MODERATION' : 
+              user.verificationStatus === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
+      moderatorComment: user.verificationStatus === 'REJECTED' ? 'Отклонено администратором' : undefined,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    }));
+    
+    res.json({
+      success: true,
+      data: verifications,
+      message: 'Document verifications retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Admin document verifications error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 app.get('/api/admin/stats', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
   try {
     // TODO: Add admin role check
