@@ -30,6 +30,7 @@ const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [documentVerifications, setDocumentVerifications] = useState<DocumentVerification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('ALL');
@@ -42,22 +43,41 @@ const UsersPage: React.FC = () => {
     try {
       setLoading(true);
       
+      // Check if admin is logged in
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        console.error('No admin token found');
+        setError('Необходимо войти в систему');
+        return;
+      }
+      
       // Load users from API
       const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+      console.log('Loading users from:', `${API_BASE_URL}/admin/users`);
       const usersResponse = await fetch(`${API_BASE_URL}/admin/users`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+          'Authorization': `Bearer ${token}`
         }
       });
+      console.log('Users response status:', usersResponse.status);
       if (usersResponse.ok) {
         const usersData = await usersResponse.json();
+        console.log('Users data received:', usersData);
         if (usersData.success) {
+          console.log('Setting users:', usersData.data);
           setUsers(usersData.data.map((user: any) => ({
             ...user,
             createdAt: new Date(user.createdAt),
             updatedAt: new Date(user.updatedAt)
           })));
+        } else {
+          console.error('API error:', usersData.error);
+          setError(`Ошибка API: ${usersData.error}`);
         }
+      } else {
+        const errorText = await usersResponse.text();
+        console.error('HTTP error:', usersResponse.status, errorText);
+        setError(`Ошибка HTTP: ${usersResponse.status}`);
       }
       
       // Load document verifications from API
@@ -163,6 +183,20 @@ const UsersPage: React.FC = () => {
 
   if (loading) {
     return <div className="admin-users-page loading">Загрузка пользователей...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="admin-users-page">
+        <div className="error-message">
+          <h3>Ошибка</h3>
+          <p>{error}</p>
+          <button onClick={() => window.location.reload()}>
+            Перезагрузить страницу
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
