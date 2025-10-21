@@ -67,9 +67,15 @@ export class DatabaseService {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await prisma.user.findMany({
+    const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' }
     });
+    
+    // Convert BigInt telegramId to string for JSON serialization
+    return users.map(user => ({
+      ...user,
+      telegramId: user.telegramId.toString()
+    })) as any;
   }
 
   // Trailer operations
