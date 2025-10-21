@@ -13,6 +13,7 @@ export interface AuthRequest extends Request {
 }
 
 export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+  logger.info('Auth middleware started for:', req.path);
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -21,14 +22,17 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   if (!token && telegramInitData) {
     // accept request but attach a synthetic user from verified initData at auth endpoint layer
     // here we just skip to handler; handlers that require req.user should first ensure JWT flow used
+    logger.info('Auth middleware: using telegram init data');
     return next();
   }
 
   if (!token) {
+    logger.info('Auth middleware: no token found');
     return res.status(401).json({ success: false, error: 'Access token required' });
   }
 
   const jwtSecret = process.env['JWT_SECRET'] || 'supersecretjwtkey';
+  logger.info('Auth middleware: verifying token...');
 
   jwt.verify(token, jwtSecret, (err: any, user: any) => {
     if (err) {
@@ -36,6 +40,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
       return res.status(403).json({ success: false, error: 'Invalid or expired token' });
     }
 
+    logger.info('Auth middleware: token verified, setting user');
     req.user = user;
     next();
   });
