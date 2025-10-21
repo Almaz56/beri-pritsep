@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './UsersPage.css';
 
 interface User {
@@ -27,6 +28,7 @@ interface DocumentVerification {
 // Mock data removed - using real API calls
 
 const UsersPage: React.FC = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [documentVerifications, setDocumentVerifications] = useState<DocumentVerification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -291,6 +293,13 @@ const UsersPage: React.FC = () => {
               </div>
 
               <div className="user-actions">
+                <button 
+                  className="profile-button"
+                  onClick={() => navigate(`/users/${user.id}`)}
+                >
+                  👤 Профиль
+                </button>
+                
                 {docVerification && (
                   <button 
                     className="documents-button"

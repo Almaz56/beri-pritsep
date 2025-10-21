@@ -223,6 +223,25 @@
   flex-wrap: wrap;
 }
 
+.profile-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-button:hover {
+  background-color: #0056b3;
+}
+
 .documents-button {
   background-color: #17a2b8;
   color: white;

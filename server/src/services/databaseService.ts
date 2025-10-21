@@ -299,21 +299,18 @@ export class DatabaseService {
   }
 
   async updateVerificationStatus(userId: number, status: VerificationStatus, comment?: string): Promise<User> {
-    return await prisma.user.update({
+    const user = await prisma.user.update({
       where: { id: userId },
       data: { 
-        verificationStatus: status,
-        verificationDocs: {
-          updateMany: {
-            where: { userId },
-            data: { 
-              status,
-              moderatorComment: comment
-            }
-          }
-        }
+        verificationStatus: status
       }
     });
+    
+    // Convert BigInt telegramId to string for JSON serialization
+    return {
+      ...user,
+      telegramId: user.telegramId.toString()
+    } as any;
   }
 
   // Statistics
@@ -564,9 +561,17 @@ export class DatabaseService {
   }
 
   async getUser(userId: number): Promise<User | null> {
-    return await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId }
     });
+    
+    if (!user) return null;
+    
+    // Convert BigInt telegramId to string for JSON serialization
+    return {
+      ...user,
+      telegramId: user.telegramId.toString()
+    } as any;
   }
 }
 

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
 import LoginForm from './components/LoginForm';
 import Dashboard from './pages/Dashboard';
 import Trailers from './pages/Trailers';
 import LocationsPage from './pages/LocationsPage';
 import UsersPage from './pages/UsersPage';
+import UserProfilePage from './pages/UserProfilePage';
 import BookingsPage from './pages/BookingsPage';
 import TransactionsPage from './pages/TransactionsPage';
 import PhotoComparisonsPage from './pages/PhotoComparisonsPage';
@@ -14,12 +16,7 @@ import './App.css';
 type Page = 'dashboard' | 'trailers' | 'locations' | 'users' | 'bookings' | 'transactions' | 'photo-comparisons' | 'support';
 
 const AdminApp: React.FC = () => {
-  const { admin, login, logout, loading, error } = useAdminAuth();
-  const [currentPage, setCurrentPage] = useState<Page>(() => {
-    // Restore page from localStorage on app load
-    const savedPage = localStorage.getItem('admin-current-page') as Page;
-    return savedPage || 'dashboard';
-  });
+  const { admin, login, loading, error } = useAdminAuth();
 
   const handleLogin = async (email: string, password: string) => {
     try {
@@ -27,12 +24,6 @@ const AdminApp: React.FC = () => {
     } catch (err) {
       // Error is handled by the context
     }
-  };
-
-  const handlePageChange = (page: Page) => {
-    setCurrentPage(page);
-    // Save current page to localStorage
-    localStorage.setItem('admin-current-page', page);
   };
 
   if (loading) {
@@ -48,27 +39,42 @@ const AdminApp: React.FC = () => {
     return <LoginForm onLogin={handleLogin} loading={loading} error={error || undefined} />;
   }
 
+  return (
+    <Router>
+      <AdminLayout />
+    </Router>
+  );
+};
+
+const AdminLayout: React.FC = () => {
+  const { admin, logout } = useAdminAuth();
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    // Restore page from localStorage on app load
+    const savedPage = localStorage.getItem('admin-current-page') as Page;
+    return savedPage || 'dashboard';
+  });
+
+  const handlePageChange = (page: Page) => {
+    setCurrentPage(page);
+    // Save current page to localStorage
+    localStorage.setItem('admin-current-page', page);
+  };
+
   const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard onNavigate={handlePageChange} />;
-      case 'trailers':
-        return <Trailers />;
-      case 'locations':
-        return <LocationsPage />;
-      case 'users':
-        return <UsersPage />;
-      case 'bookings':
-        return <BookingsPage />;
-      case 'transactions':
-        return <TransactionsPage />;
-      case 'photo-comparisons':
-        return <PhotoComparisonsPage />;
-      case 'support':
-        return <SupportPage />;
-      default:
-        return <Dashboard onNavigate={handlePageChange} />;
-    }
+    return (
+      <Routes>
+        <Route path="/" element={<Dashboard onNavigate={handlePageChange} />} />
+        <Route path="/dashboard" element={<Dashboard onNavigate={handlePageChange} />} />
+        <Route path="/trailers" element={<Trailers />} />
+        <Route path="/locations" element={<LocationsPage />} />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/users/:userId" element={<UserProfilePage />} />
+        <Route path="/bookings" element={<BookingsPage />} />
+        <Route path="/transactions" element={<TransactionsPage />} />
+        <Route path="/photo-comparisons" element={<PhotoComparisonsPage />} />
+        <Route path="/support" element={<SupportPage />} />
+      </Routes>
+    );
   };
 
   const getPageTitle = () => {
@@ -172,8 +178,8 @@ const AdminApp: React.FC = () => {
           <div className="user-info">
             <div className="user-avatar">👨‍💼</div>
             <div className="user-details">
-              <p className="user-name">{admin.firstName} {admin.lastName}</p>
-              <p className="user-role">{admin.role}</p>
+              <p className="user-name">{admin?.firstName} {admin?.lastName}</p>
+              <p className="user-role">{admin?.role}</p>
             </div>
           </div>
         </div>
