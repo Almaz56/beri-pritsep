@@ -43,7 +43,12 @@ const UsersPage: React.FC = () => {
       setLoading(true);
       
       // Load users from API
-      const usersResponse = await fetch('/api/admin/users');
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+      const usersResponse = await fetch(`${API_BASE_URL}/admin/users`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+        }
+      });
       if (usersResponse.ok) {
         const usersData = await usersResponse.json();
         if (usersData.success) {
@@ -56,7 +61,11 @@ const UsersPage: React.FC = () => {
       }
       
       // Load document verifications from API
-      const docsResponse = await fetch('/api/admin/document-verifications');
+      const docsResponse = await fetch(`${API_BASE_URL}/admin/document-verifications`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+        }
+      });
       if (docsResponse.ok) {
         const docsData = await docsResponse.json();
         if (docsData.success) {
@@ -76,11 +85,12 @@ const UsersPage: React.FC = () => {
 
   const handleVerifyUser = async (userId: string, status: 'VERIFIED' | 'REJECTED', comment?: string) => {
     try {
-      const response = await fetch(`/api/admin/users/${userId}/verify`, {
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/verify`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin-token')}`
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
         },
         body: JSON.stringify({ status, comment })
       });
