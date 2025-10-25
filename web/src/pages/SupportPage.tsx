@@ -480,15 +480,15 @@ const SupportPage: React.FC = () => {
             <p>Мы всегда готовы помочь <span className="online-indicator">🟢</span></p>
           </div>
           <div className="header-right">
-            {chat && (
-              <button 
-                className="refresh-btn" 
-                onClick={loadChat}
-                title="Обновить сообщения"
-              >
-                🔄
-              </button>
-            )}
+          {chat && (
+            <button 
+              className="refresh-btn" 
+              onClick={loadChat}
+              title="Обновить сообщения"
+            >
+              🔄
+            </button>
+          )}
           </div>
         </div>
       </div>
