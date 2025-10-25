@@ -17,16 +17,16 @@ interface DashboardStats {
 }
 
 const mockStats: DashboardStats = {
-  totalUsers: 156,
-  pendingVerifications: 12,
-  totalBookings: 89,
-  activeBookings: 15,
-  totalRevenue: 245000,
-  pendingPayments: 18000,
-  totalTrailers: 8,
-  availableTrailers: 5,
-  totalLocations: 2,
-  totalTransactions: 234
+  totalUsers: 0,
+  pendingVerifications: 0,
+  totalBookings: 0,
+  activeBookings: 0,
+  totalRevenue: 0,
+  pendingPayments: 0,
+  totalTrailers: 0,
+  availableTrailers: 0,
+  totalLocations: 0,
+  totalTransactions: 0
 };
 
 type Page = 'dashboard' | 'trailers' | 'locations' | 'users' | 'bookings' | 'transactions' | 'photo-comparisons' | 'support';

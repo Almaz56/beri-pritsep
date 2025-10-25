@@ -23,63 +23,9 @@ interface Booking {
   endTime: Date;
 }
 
-const mockTransactions: Transaction[] = [
-  {
-    id: 'txn_1',
-    bookingId: 'booking_1',
-    userId: 'user_dev_1',
-    type: 'RENTAL_PAYMENT',
-    amount: 700,
-    status: 'SUCCESS',
-    paymentMethod: 'TINKOFF',
-    tinkoffPaymentId: 'tinkoff_12345',
-    description: 'Оплата аренды прицепа + услуга забора',
-    createdAt: new Date('2024-01-19T16:00:00'),
-    updatedAt: new Date('2024-01-19T16:05:00')
-  },
-  {
-    id: 'txn_2',
-    bookingId: 'booking_1',
-    userId: 'user_dev_1',
-    type: 'DEPOSIT_HOLD',
-    amount: 5000,
-    status: 'SUCCESS',
-    paymentMethod: 'TINKOFF',
-    tinkoffPaymentId: 'tinkoff_12346',
-    description: 'Блокировка залога',
-    createdAt: new Date('2024-01-19T16:00:00'),
-    updatedAt: new Date('2024-01-19T16:05:00')
-  },
-  {
-    id: 'txn_3',
-    bookingId: 'booking_2',
-    userId: 'user_2',
-    type: 'RENTAL_PAYMENT',
-    amount: 900,
-    status: 'PENDING',
-    paymentMethod: 'TINKOFF',
-    description: 'Оплата суточной аренды',
-    createdAt: new Date('2024-01-20T12:00:00'),
-    updatedAt: new Date('2024-01-20T12:00:00')
-  }
-];
+const mockTransactions: Transaction[] = [];
 
-const mockBookings: Booking[] = [
-  {
-    id: 'booking_1',
-    userId: 'user_dev_1',
-    trailerId: 'trailer_1',
-    startTime: new Date('2024-01-20T10:00:00'),
-    endTime: new Date('2024-01-20T14:00:00')
-  },
-  {
-    id: 'booking_2',
-    userId: 'user_2',
-    trailerId: 'trailer_2',
-    startTime: new Date('2024-01-21T09:00:00'),
-    endTime: new Date('2024-01-22T09:00:00')
-  }
-];
+const mockBookings: Booking[] = [];
 
 const TransactionsPage: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);

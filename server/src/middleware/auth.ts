@@ -20,9 +20,9 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   // Fallback: allow X-Telegram-Init-Data when no Bearer token (TWA auto-login)
   const telegramInitData = req.header('x-telegram-init-data');
   if (!token && telegramInitData) {
-    // accept request but attach a synthetic user from verified initData at auth endpoint layer
-    // here we just skip to handler; handlers that require req.user should first ensure JWT flow used
-    logger.info('Auth middleware: using telegram init data');
+    // Attach placeholder user, the route may not require full profile
+    (req as any).user = { id: '0' } as any;
+    logger.info('Auth middleware: using telegram init data (fallback user id=0)');
     return next();
   }
 

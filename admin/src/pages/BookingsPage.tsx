@@ -27,44 +27,10 @@ interface Trailer {
   name: string;
 }
 
-const mockBookings: Booking[] = [
-  {
-    id: 'booking_1',
-    userId: 'user_dev_1',
-    trailerId: 'trailer_1',
-    startTime: new Date('2024-01-20T10:00:00'),
-    endTime: new Date('2024-01-20T14:00:00'),
-    rentalType: 'HOURLY',
-    additionalServices: { pickup: true },
-    pricing: { baseCost: 500, additionalCost: 200, deposit: 5000, total: 5700 },
-    status: 'ACTIVE',
-    createdAt: new Date('2024-01-19T15:30:00'),
-    updatedAt: new Date('2024-01-20T10:00:00')
-  },
-  {
-    id: 'booking_2',
-    userId: 'user_2',
-    trailerId: 'trailer_2',
-    startTime: new Date('2024-01-21T09:00:00'),
-    endTime: new Date('2024-01-22T09:00:00'),
-    rentalType: 'DAILY',
-    additionalServices: { pickup: false },
-    pricing: { baseCost: 900, additionalCost: 0, deposit: 5000, total: 5900 },
-    status: 'PENDING_PAYMENT',
-    createdAt: new Date('2024-01-20T12:00:00'),
-    updatedAt: new Date('2024-01-20T12:00:00')
-  }
-];
+const mockBookings: Booking[] = [];
 
-const mockUsers: User[] = [
-  { id: 'user_dev_1', firstName: 'Иван', lastName: 'Петров', phone: '+7 (900) 123-45-67' },
-  { id: 'user_2', firstName: 'Мария', lastName: 'Сидорова', phone: '+7 (900) 987-65-43' }
-];
-
-const mockTrailers: Trailer[] = [
-  { id: 'trailer_1', name: 'Фургон 2т с тентом' },
-  { id: 'trailer_2', name: 'Платформа 1.5т без тента' }
-];
+const mockUsers: User[] = [];
+const mockTrailers: Trailer[] = [];
 
 const BookingsPage: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);

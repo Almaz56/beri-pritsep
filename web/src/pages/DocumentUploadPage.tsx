@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { documentsApi, getAuthToken, authApi } from '../api';
-import { showTelegramAlert, setupTelegramMainButton, hideTelegramMainButton } from '../telegram';
+import { documentsApi, getAuthToken } from '../api';
+import { showTelegramAlert } from '../telegram';
 import './DocumentUploadPage.css';
 
 type DocumentType = 'PASSPORT' | 'DRIVER_LICENSE';
@@ -15,7 +15,21 @@ const DocumentUploadPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [ocrPreview, setOcrPreview] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(getAuthToken());
-  const [userId, setUserId] = useState<string | null>(null);
+  // userId не нужен на клиенте, сервер берет его из JWT
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    if (bytes < 0) return 'Invalid size';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    if (i >= sizes.length) return 'Too large';
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   useEffect(() => {
     // refresh token from unified storage in case it was set after auth
@@ -30,32 +44,7 @@ const DocumentUploadPage: React.FC = () => {
       return;
     }
 
-    // Fetch current user profile to get real userId
-    (async () => {
-      try {
-        const profile = await authApi.getProfile(token);
-        if (profile.success && profile.data) {
-          setUserId(profile.data.id);
-        } else {
-          showTelegramAlert('Не удалось получить профиль пользователя. Пожалуйста, войдите заново.');
-          navigate('/profile');
-        }
-      } catch {
-        showTelegramAlert('Ошибка при получении профиля. Пожалуйста, войдите заново.');
-        navigate('/profile');
-      }
-    })();
-
-    // Get user ID from token (in real app, would decode JWT)
-    // For now, we'll use a mock user ID
-    setUserId('user_dev_1');
-
-    setupTelegramMainButton('Загрузить документ', handleUploadDocument, { 
-      isActive: selectedFile !== null && !loading 
-    });
-
     return () => {
-      hideTelegramMainButton();
       if (preview) {
         URL.revokeObjectURL(preview);
       }
@@ -73,6 +62,14 @@ const DocumentUploadPage: React.FC = () => {
       return;
     }
 
+    // Debug file information
+    console.log('Selected file:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    });
+
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
@@ -86,6 +83,18 @@ const DocumentUploadPage: React.FC = () => {
       return;
     }
 
+    // Additional validation for suspicious file sizes
+    if (file.size === 0) {
+      setError('Файл пустой или поврежден');
+      return;
+    }
+
+    // Check for extremely large files (likely corrupted)
+    if (file.size > 100 * 1024 * 1024) { // 100MB
+      setError('Файл слишком большой. Максимальный размер: 10MB');
+      return;
+    }
+
     setSelectedFile(file);
     
     // Create preview
@@ -94,10 +103,28 @@ const DocumentUploadPage: React.FC = () => {
   }, []);
 
   const handleUploadDocument = useCallback(async () => {
-    if (!selectedFile || !userId || !token) {
+    if (!selectedFile || !token) {
       setError('Пожалуйста, выберите файл и убедитесь, что вы авторизованы');
       return;
     }
+
+    // Additional validation before upload
+    if (selectedFile.size === 0) {
+      setError('Файл пустой или поврежден');
+      return;
+    }
+
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('Размер файла не должен превышать 10MB');
+      return;
+    }
+
+    console.log('Uploading file:', {
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+      formattedSize: formatFileSize(selectedFile.size)
+    });
 
     setLoading(true);
     setError(null);
@@ -132,7 +159,7 @@ const DocumentUploadPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedFile, userId, token, selectedDocumentType, navigate]);
+  }, [selectedFile, token, selectedDocumentType, navigate]);
 
   const getDocumentTypeLabel = (type: DocumentType): string => {
     switch (type) {
@@ -210,13 +237,37 @@ const DocumentUploadPage: React.FC = () => {
         </label>
       </div>
 
+      {/* Primary upload button near the top, always visible */}
+      {!loading && (
+        <div style={{ margin: '8px 0 16px 0' }}>
+          <button
+            className="upload-button"
+            onClick={handleUploadDocument}
+            disabled={!selectedFile || !token}
+          >
+            Загрузить документ
+          </button>
+        </div>
+      )}
+
       {preview && (
         <div className="document-preview">
           <h3>Предварительный просмотр</h3>
           <img src={preview} alt="Document preview" className="preview-image" />
           <p className="file-info">
-            Файл: {selectedFile?.name} ({(selectedFile?.size || 0 / 1024 / 1024).toFixed(2)} MB)
+            Файл: {selectedFile?.name} ({selectedFile ? formatFileSize(selectedFile.size) : '0.00 MB'})
           </p>
+          {/* Inline visible upload button (duplicate of fixed bar) */}
+          {!loading && (
+            <button
+              className="upload-button"
+              onClick={handleUploadDocument}
+              disabled={!selectedFile || !token}
+              style={{ marginTop: 12 }}
+            >
+              Загрузить документ
+            </button>
+          )}
         </div>
       )}
 
@@ -233,9 +284,25 @@ const DocumentUploadPage: React.FC = () => {
       )}
 
       {loading && (
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <span>Загрузка документа...</span>
+        <div className="fullscreen-loading">
+          <div className="loading-content">
+            <div className="modern-spinner"></div>
+            <p className="loading-text">Загрузка документа...</p>
+            <p className="loading-subtext">Обрабатываем ваш файл</p>
+          </div>
+        </div>
+      )}
+
+      {/* Always-visible fixed bottom bar button */}
+      {!loading && (
+        <div className="upload-fixed-bar">
+          <button
+            className="upload-button"
+            onClick={handleUploadDocument}
+            disabled={!selectedFile || !token}
+          >
+            Загрузить документ
+          </button>
         </div>
       )}
     </div>

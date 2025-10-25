@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { bookingsApi, type Booking, authApi, setAuthToken, getAuthToken } from '../api';
 import { getTelegramInitData } from '../telegram';
 import { showTelegramAlert } from '../telegram';
+import PaymentHandler from '../components/PaymentHandler';
 import './BookingsPage.css';
 
 const BookingsPage: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
     loadBookings();
@@ -97,6 +99,20 @@ const BookingsPage: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handlePaymentSuccess = (bookingId: number) => {
+    showTelegramAlert('Платеж успешно обработан!');
+    // Обновляем статус бронирования
+    setBookings(prev => prev.map(booking => 
+      booking.id === bookingId 
+        ? { ...booking, status: 'PAID' as const }
+        : booking
+    ));
+  };
+
+  const handlePaymentError = (bookingId: number, error: string) => {
+    showTelegramAlert(`Ошибка платежа: ${error}`);
   };
 
   if (loading) {
@@ -192,6 +208,34 @@ const BookingsPage: React.FC = () => {
                   Создано: {formatDateTime(booking.createdAt)}
                 </span>
               </div>
+
+              {/* Payment Section for PENDING_PAYMENT bookings */}
+              {booking.status === 'PENDING_PAYMENT' && (
+                <div className="payment-section">
+                  <h4>Оплата аренды</h4>
+                  <PaymentHandler
+                    bookingId={booking.id.toString()}
+                    amount={booking.pricing.baseCost + booking.pricing.additionalCost}
+                    paymentType="RENTAL"
+                    onSuccess={() => handlePaymentSuccess(booking.id)}
+                    onError={(error) => handlePaymentError(booking.id, error)}
+                  />
+                </div>
+              )}
+
+              {/* Deposit Section for PAID bookings */}
+              {booking.status === 'PAID' && (
+                <div className="payment-section">
+                  <h4>Залог</h4>
+                  <PaymentHandler
+                    bookingId={booking.id.toString()}
+                    amount={booking.pricing.deposit}
+                    paymentType="DEPOSIT_HOLD"
+                    onSuccess={() => handlePaymentSuccess(booking.id)}
+                    onError={(error) => handlePaymentError(booking.id, error)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>

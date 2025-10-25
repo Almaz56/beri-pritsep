@@ -1437,6 +1437,106 @@ app.get('/api/admin/document-verifications', authenticateAdmin, requireAdmin, as
   }
 });
 
+// Get user documents
+app.get('/api/admin/users/:userId/documents', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    
+    // Get user documents from database
+    const documents = await databaseService.getUserDocuments(parseInt(userId));
+    
+    res.json({
+      success: true,
+      data: documents,
+      message: 'User documents retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Admin get user documents error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// View user document
+app.get('/api/admin/users/:userId/documents/:documentId/view', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const { userId, documentId } = req.params;
+    
+    // Get document from database
+    const document = await databaseService.getUserDocument(parseInt(userId), parseInt(documentId));
+    
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: 'Document not found'
+      });
+    }
+    
+    // Serve the file
+    const fs = require('fs');
+    const path = require('path');
+    
+    const filePath = path.join('/app', 'uploads', document.filePath);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+    
+    // Set appropriate headers for file download/viewing
+    const ext = path.extname(document.filename).toLowerCase();
+    let contentType = 'application/octet-stream';
+    
+    if (ext === '.jpg' || ext === '.jpeg') {
+      contentType = 'image/jpeg';
+    } else if (ext === '.png') {
+      contentType = 'image/png';
+    } else if (ext === '.webp') {
+      contentType = 'image/webp';
+    }
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${document.filename}"`);
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+    
+  } catch (error) {
+    logger.error('Admin view document error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Reset user verification status
+app.put('/api/admin/users/:userId/reset-verification', authenticateAdmin, requireAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    
+    // Reset user verification status to PENDING
+    const user = await databaseService.updateVerificationStatus(parseInt(userId), 'PENDING');
+    
+    res.json({
+      success: true,
+      data: user,
+      message: 'User verification status reset successfully'
+    });
+  } catch (error) {
+    logger.error('Admin reset verification error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 initializeServer();
 
 // WebSocket authentication middleware

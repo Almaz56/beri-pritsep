@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { showTelegramAlert } from '../telegram';
+import { showTelegramAlert, setupTelegramMainButton, hideTelegramMainButton } from '../telegram';
 import { getAuthToken } from '../api';
 import './PaymentHandler.css';
 
@@ -53,8 +53,7 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
       },
       body: JSON.stringify({
         bookingId,
-        amount,
-        type: paymentType
+        paymentType: paymentType === 'RENTAL' ? 'rental' : 'deposit'
       })
     });
 
@@ -198,6 +197,23 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
         return '';
     }
   };
+
+  // Expose Telegram MainButton for mini-app so the user always sees an obvious Pay button
+  useEffect(() => {
+    // Show when actionable
+    if (!loading && (paymentStatus === 'idle' || paymentStatus === 'failed')) {
+      setupTelegramMainButton('Оплатить', handlePayment, {
+        color: '#4CAF50',
+        textColor: '#ffffff'
+      });
+    } else {
+      hideTelegramMainButton();
+    }
+    return () => {
+      hideTelegramMainButton();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentStatus, loading]);
 
   return (
     <div className="payment-handler">

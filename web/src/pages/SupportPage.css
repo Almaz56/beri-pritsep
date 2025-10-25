@@ -1,40 +1,96 @@
 .support-page {
   padding: 0;
   min-height: 100vh;
-  background: #f0f0f0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #333;
   display: flex;
   flex-direction: column;
   position: relative;
 }
 
+/* Fix the rectangle above input field - this is likely the chat-messages background */
+.chat-messages {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Ensure no extra spacing that could create rectangles */
+.support-content {
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
 /* Ensure NavBar is always visible in support page */
-.support-page + .navbar {
+.support-page .navbar,
+.app-container .navbar,
+.navbar {
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
-  z-index: 1000 !important;
+  z-index: 9999999 !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+/* Override any hide-navigation class for support page */
+body.hide-navigation .navbar,
+body.hide-navigation .support-page .navbar,
+body.hide-navigation .app-container .navbar,
+.navbar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999999 !important;
+}
+
+/* Force navbar to be visible in support page */
+.support-page ~ .navbar,
+.support-page .navbar,
+.app-container .navbar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999999 !important;
 }
 
 .support-header {
-  background: #2481cc;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 15px 20px;
+  padding: 20px;
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  text-align: center;
+  width: 100%;
 }
 
-.header-content > div {
+.header-left {
   flex: 1;
+  text-align: left;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .back-btn {
@@ -103,8 +159,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-bottom: 80px; /* Space for fixed input */
+  padding-bottom: 0;
   margin-bottom: 0;
+  min-height: 0;
 }
 
 .loading, .error {
@@ -188,13 +245,16 @@
 }
 
 .chat-container {
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin: 0;
-  border-radius: 0;
-  box-shadow: none;
+  margin: 20px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
 }
 
 .chat-messages {
@@ -232,9 +292,10 @@
 
 .user-message {
   align-self: flex-end;
-  background: #2481cc;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .admin-message {
@@ -277,15 +338,17 @@
 }
 
 .message-input {
-  padding: 10px 15px;
-  background: white;
-  border-top: 1px solid #e1e8ed;
+  padding: 15px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid rgba(225, 232, 237, 0.5);
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   position: sticky;
-  bottom: 0;
-  z-index: 10;
+  bottom: 80px; /* Above navbar */
+  z-index: 9999999; /* Same as navbar */
+  backdrop-filter: blur(20px);
+  border-radius: 0 0 20px 20px;
 }
 
 .message-input input {
@@ -307,20 +370,23 @@
 }
 
 .message-input button {
-  padding: 10px 16px;
-  background: #2481cc;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 20px;
+  border-radius: 25px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
-  min-width: 70px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 80px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .message-input button:hover:not(:disabled) {
-  background: #1e6bb8;
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .message-input button:disabled {
@@ -507,7 +573,7 @@
 /* Fixed input styles - ALWAYS VISIBLE */
 .message-input-fixed {
   position: fixed !important;
-  bottom: 0px !important;
+  bottom: 80px !important; /* Above navbar (80px height) */
   left: 0 !important;
   right: 0 !important;
   background: white !important;
@@ -516,7 +582,7 @@
   display: flex !important;
   gap: 10px !important;
   align-items: center !important;
-  z-index: 999999 !important;
+  z-index: 9999999 !important; /* Same as navbar */
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
   /* Force visibility */
   width: 100vw !important;
@@ -529,11 +595,11 @@
 
 /* When input is focused, move to bottom */
 .message-input-fixed.input-focused {
-  bottom: 0px !important;
+  bottom: 80px !important; /* Still above navbar when focused */
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-  /* Ensure it's at the very bottom when focused */
+  /* Ensure it's above navbar when focused */
   position: fixed !important;
-  z-index: 99999 !important;
+  z-index: 9999999 !important;
 }
 
 .message-input-fixed input {

@@ -283,10 +283,11 @@ const ProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="profile-page">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Загрузка профиля...</p>
+      <div className="fullscreen-loading">
+        <div className="loading-content">
+          <div className="modern-spinner"></div>
+          <p className="loading-text">Загрузка профиля...</p>
+          <p className="loading-subtext">Получаем ваши данные</p>
         </div>
       </div>
     );
@@ -429,7 +430,10 @@ const ProfilePage: React.FC = () => {
             <h2>Верификация отклонена</h2>
             <div className="verification-info">
               <p>Ваши документы не прошли проверку. Пожалуйста, загрузите качественные фото документов.</p>
-              <button className="upload-docs-button">
+              <button 
+                className="upload-docs-button"
+                onClick={() => navigate('/documents/upload')}
+              >
                 Загрузить документы повторно
               </button>
             </div>

@@ -34,65 +34,7 @@ interface PhotoComparison {
   updatedAt: Date;
 }
 
-const mockComparisons: PhotoComparison[] = [
-  {
-    id: 'comp_1',
-    bookingId: 'booking_1',
-    side: 'FRONT',
-    beforePhoto: {
-      id: 'photo_1',
-      filename: 'before_front.jpg',
-      url: '/uploads/before_front.jpg',
-      uploadedAt: new Date('2024-01-20T09:00:00')
-    },
-    afterPhoto: {
-      id: 'photo_2',
-      filename: 'after_front.jpg',
-      url: '/uploads/after_front.jpg',
-      uploadedAt: new Date('2024-01-20T14:00:00')
-    },
-    comparison: {
-      hasDamage: true,
-      damageLevel: 'MINOR',
-      damageDescription: ['Поверхностная царапина на бампере'],
-      confidence: 0.85,
-      differences: [{
-        type: 'SCRATCH',
-        severity: 'LOW',
-        description: 'Поверхностная царапина на бампере',
-        location: 'Передний бампер'
-      }]
-    },
-    createdAt: new Date('2024-01-20T14:05:00'),
-    updatedAt: new Date('2024-01-20T14:05:00')
-  },
-  {
-    id: 'comp_2',
-    bookingId: 'booking_1',
-    side: 'REAR',
-    beforePhoto: {
-      id: 'photo_3',
-      filename: 'before_rear.jpg',
-      url: '/uploads/before_rear.jpg',
-      uploadedAt: new Date('2024-01-20T09:00:00')
-    },
-    afterPhoto: {
-      id: 'photo_4',
-      filename: 'after_rear.jpg',
-      url: '/uploads/after_rear.jpg',
-      uploadedAt: new Date('2024-01-20T14:00:00')
-    },
-    comparison: {
-      hasDamage: false,
-      damageLevel: 'NONE',
-      damageDescription: [],
-      confidence: 0.92,
-      differences: []
-    },
-    createdAt: new Date('2024-01-20T14:05:00'),
-    updatedAt: new Date('2024-01-20T14:05:00')
-  }
-];
+const mockComparisons: PhotoComparison[] = [];
 
 const PhotoComparisonsPage: React.FC = () => {
   const [comparisons, setComparisons] = useState<PhotoComparison[]>([]);

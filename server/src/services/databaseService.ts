@@ -259,7 +259,7 @@ export class DatabaseService {
 
   async updatePaymentStatus(paymentId: string, status: PaymentStatus): Promise<Payment> {
     return await prisma.payment.update({
-      where: { paymentId },
+      where: { tinkoffPaymentId: paymentId },
       data: { status }
     });
   }
@@ -572,6 +572,58 @@ export class DatabaseService {
       ...user,
       telegramId: user.telegramId.toString()
     } as any;
+  }
+
+  async getUserDocuments(userId: number): Promise<any[]> {
+    try {
+      // Get user documents from VerificationDocument table
+      const documents = await prisma.verificationDocument.findMany({
+        where: { userId: userId },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      // Convert to the format expected by frontend
+      return documents.map(doc => ({
+        id: doc.id,
+        userId: doc.userId,
+        type: doc.documentType,
+        status: doc.status,
+        filename: doc.filename,
+        filePath: doc.filePath,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt
+      }));
+    } catch (error) {
+      console.error('Error getting user documents:', error);
+      return [];
+    }
+  }
+
+  async getUserDocument(userId: number, documentId: number): Promise<any | null> {
+    try {
+      const document = await prisma.verificationDocument.findFirst({
+        where: { 
+          id: documentId,
+          userId: userId 
+        }
+      });
+
+      if (!document) return null;
+
+      return {
+        id: document.id,
+        userId: document.userId,
+        type: document.documentType,
+        status: document.status,
+        filename: document.filename,
+        filePath: document.filePath,
+        createdAt: document.createdAt,
+        updatedAt: document.updatedAt
+      };
+    } catch (error) {
+      console.error('Error getting user document:', error);
+      return null;
+    }
   }
 }
 

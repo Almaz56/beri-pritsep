@@ -12,7 +12,7 @@ class DocumentService {
   private multerConfig: multer.Multer;
 
   constructor() {
-    this.uploadPath = process.env['UPLOAD_PATH'] || path.join(__dirname, '../../uploads');
+    this.uploadPath = process.env['UPLOAD_PATH'] || path.join('/app', 'uploads');
     this.maxFileSize = parseInt(process.env['MAX_FILE_SIZE'] || '10485760'); // Default 10MB
 
     // Ensure upload directory exists

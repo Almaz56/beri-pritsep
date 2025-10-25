@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import './UserProfilePage.css';
+
+interface UserProfilePageProps {
+  userId: string;
+  onBack: () => void;
+}
 
 interface User {
   id: number;
@@ -40,12 +44,12 @@ interface Document {
   type: string;
   status: string;
   filename: string;
+  filePath: string;
   createdAt: string;
+  updatedAt: string;
 }
 
-const UserProfilePage: React.FC = () => {
-  const { userId } = useParams<{ userId: string }>();
-  const navigate = useNavigate();
+const UserProfilePage: React.FC<UserProfilePageProps> = ({ userId, onBack }) => {
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -109,17 +113,17 @@ const UserProfilePage: React.FC = () => {
         }
       ]);
 
-      // Load documents (mock data for now)
-      setDocuments([
-        {
-          id: 1,
-          userId: parseInt(userId!),
-          type: 'PASSPORT',
-          status: 'PENDING',
-          filename: 'passport.jpg',
-          createdAt: '2025-10-14T10:00:00Z'
+      // Load documents from API
+      const docsResponse = await fetch(`${API_BASE_URL}/admin/users/${userId}/documents`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (docsResponse.ok) {
+        const docsData = await docsResponse.json();
+        if (docsData.success) {
+          setDocuments(docsData.data);
         }
-      ]);
+      }
 
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -157,6 +161,103 @@ const UserProfilePage: React.FC = () => {
     }
   };
 
+  const handleResetVerification = async () => {
+    if (!confirm('Вы уверены, что хотите сбросить статус верификации? Пользователь сможет загрузить документы заново.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) return;
+
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/reset-verification`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setUser(result.data);
+          alert('Статус верификации сброшен. Пользователь может загрузить документы заново.');
+        }
+      }
+    } catch (error) {
+      console.error('Error resetting verification:', error);
+      alert('Ошибка при сбросе статуса верификации');
+    }
+  };
+
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [documentLoading, setDocumentLoading] = useState(false);
+
+  const handleViewDocument = async (document: Document) => {
+    try {
+      setDocumentLoading(true);
+      setSelectedDocument(document);
+      
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+      const token = localStorage.getItem('admin_token');
+      
+      if (!token) {
+        alert('Необходимо войти в систему');
+        return;
+      }
+
+      // Create a temporary URL with proper authorization
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/documents/${document.id}/view`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // Create blob URL for the document
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setDocumentUrl(url);
+      } else {
+        const errorData = await response.json();
+        alert(`Ошибка при загрузке документа: ${errorData.error || 'Неизвестная ошибка'}`);
+        setSelectedDocument(null);
+      }
+    } catch (error) {
+      console.error('Error viewing document:', error);
+      alert('Ошибка при загрузке документа');
+      setSelectedDocument(null);
+    } finally {
+      setDocumentLoading(false);
+    }
+  };
+
+  const closeDocumentViewer = () => {
+    if (documentUrl) {
+      URL.revokeObjectURL(documentUrl);
+    }
+    setSelectedDocument(null);
+    setDocumentUrl(null);
+  };
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedDocument) {
+        closeDocumentViewer();
+      }
+    };
+
+    if (selectedDocument) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [selectedDocument]);
+
   if (loading) {
     return <div className="user-profile-page loading">Загрузка профиля пользователя...</div>;
   }
@@ -167,7 +268,7 @@ const UserProfilePage: React.FC = () => {
         <div className="error-message">
           <h3>Ошибка</h3>
           <p>{error}</p>
-          <button onClick={() => navigate('/admin/users')}>
+          <button onClick={() => onBack()}>
             Вернуться к списку пользователей
           </button>
         </div>
@@ -180,7 +281,7 @@ const UserProfilePage: React.FC = () => {
       <div className="user-profile-page">
         <div className="error-message">
           <h3>Пользователь не найден</h3>
-          <button onClick={() => navigate('/admin/users')}>
+          <button onClick={() => onBack()}>
             Вернуться к списку пользователей
           </button>
         </div>
@@ -193,11 +294,17 @@ const UserProfilePage: React.FC = () => {
       <div className="profile-header">
         <button 
           className="back-button"
-          onClick={() => navigate('/admin/users')}
+          onClick={onBack}
         >
           ← Назад к пользователям
         </button>
         <h2>Профиль пользователя</h2>
+        <button 
+          className="reset-button"
+          onClick={handleResetVerification}
+        >
+          🔄 Сбросить верификацию
+        </button>
       </div>
 
       <div className="profile-content">
@@ -249,6 +356,12 @@ const UserProfilePage: React.FC = () => {
                 </button>
               </>
             )}
+            <button 
+              className="reset-button"
+              onClick={handleResetVerification}
+            >
+              🔄 Сбросить верификацию
+            </button>
           </div>
         </div>
 
@@ -399,6 +512,12 @@ const UserProfilePage: React.FC = () => {
                       <div className="document-details">
                         <p><strong>Файл:</strong> {document.filename}</p>
                         <p><strong>Дата загрузки:</strong> {new Date(document.createdAt).toLocaleString('ru-RU')}</p>
+                        <button 
+                          className="view-document-button"
+                          onClick={() => handleViewDocument(document)}
+                        >
+                          👁️ Просмотреть
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -408,6 +527,66 @@ const UserProfilePage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Document Viewer Modal */}
+      {selectedDocument && (
+        <div 
+          className="document-viewer-modal"
+          onClick={closeDocumentViewer}
+        >
+          <div 
+            className="document-viewer-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="document-viewer-header">
+              <h3>Просмотр документа: {selectedDocument.filename}</h3>
+              <button 
+                className="close-button"
+                onClick={closeDocumentViewer}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="document-viewer-body">
+              {documentLoading ? (
+                <div className="loading-spinner">
+                  <div className="spinner"></div>
+                  <span>Загрузка документа...</span>
+                </div>
+              ) : documentUrl ? (
+                <div className="document-preview">
+                  {selectedDocument.filename.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) ? (
+                    <img 
+                      src={documentUrl} 
+                      alt={selectedDocument.filename}
+                      className="document-image"
+                    />
+                  ) : (
+                    <div className="document-file">
+                      <div className="file-icon">📄</div>
+                      <p>Файл: {selectedDocument.filename}</p>
+                      <p>Тип: {selectedDocument.type}</p>
+                      <p>Статус: {selectedDocument.status}</p>
+                      <a 
+                        href={documentUrl} 
+                        download={selectedDocument.filename}
+                        className="download-button"
+                      >
+                        📥 Скачать файл
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="error-message">
+                  <p>Ошибка при загрузке документа</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

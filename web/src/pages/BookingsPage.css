@@ -211,6 +211,22 @@
   color: #999;
 }
 
+/* Payment Section */
+.payment-section {
+  margin-top: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.payment-section h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .bookings-page {

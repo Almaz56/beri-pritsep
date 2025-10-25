@@ -474,24 +474,35 @@ export const documentsApi = {
    */
   async uploadDocument(formData: FormData, token: string): Promise<ApiResponse<{ documentId: string; filename: string; documentType: string; ocrPreview: any; verificationStatus: string }>> {
     try {
+      console.log('Uploading document with token:', token ? 'present' : 'missing');
+      console.log('API_BASE_URL:', API_BASE_URL);
+      
       const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-        },
+          // do NOT set Content-Type here; browser will set correct multipart boundary
+        } as any,
         body: formData,
       });
 
+      console.log('Upload response status:', response.status);
+      console.log('Upload response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Upload error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log('Upload success result:', result);
+      return result;
     } catch (error) {
       console.error('Document upload error:', error);
       return {
         success: false,
-        error: 'Ошибка подключения к серверу'
+        error: 'Ошибка подключения к серверу: ' + (error as Error).message
       };
     }
   },

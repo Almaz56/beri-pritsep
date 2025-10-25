@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
 import LoginForm from './components/LoginForm';
 import Dashboard from './pages/Dashboard';
@@ -39,11 +38,7 @@ const AdminApp: React.FC = () => {
     return <LoginForm onLogin={handleLogin} loading={loading} error={error || undefined} />;
   }
 
-  return (
-    <Router>
-      <AdminLayout />
-    </Router>
-  );
+  return <AdminLayout />;
 };
 
 const AdminLayout: React.FC = () => {
@@ -53,6 +48,7 @@ const AdminLayout: React.FC = () => {
     const savedPage = localStorage.getItem('admin-current-page') as Page;
     return savedPage || 'dashboard';
   });
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const handlePageChange = (page: Page) => {
     setCurrentPage(page);
@@ -60,21 +56,39 @@ const AdminLayout: React.FC = () => {
     localStorage.setItem('admin-current-page', page);
   };
 
+  const handleUserSelect = (userId: string) => {
+    setSelectedUserId(userId);
+  };
+
+  const handleBackToUsers = () => {
+    setSelectedUserId(null);
+  };
+
   const renderPage = () => {
-    return (
-      <Routes>
-        <Route path="/" element={<Dashboard onNavigate={handlePageChange} />} />
-        <Route path="/dashboard" element={<Dashboard onNavigate={handlePageChange} />} />
-        <Route path="/trailers" element={<Trailers />} />
-        <Route path="/locations" element={<LocationsPage />} />
-        <Route path="/users" element={<UsersPage />} />
-        <Route path="/users/:userId" element={<UserProfilePage />} />
-        <Route path="/bookings" element={<BookingsPage />} />
-        <Route path="/transactions" element={<TransactionsPage />} />
-        <Route path="/photo-comparisons" element={<PhotoComparisonsPage />} />
-        <Route path="/support" element={<SupportPage />} />
-      </Routes>
-    );
+    if (selectedUserId) {
+      return <UserProfilePage userId={selectedUserId} onBack={handleBackToUsers} />;
+    }
+
+    switch (currentPage) {
+      case 'dashboard':
+        return <Dashboard onNavigate={handlePageChange} />;
+      case 'trailers':
+        return <Trailers />;
+      case 'locations':
+        return <LocationsPage />;
+      case 'users':
+        return <UsersPage onUserSelect={handleUserSelect} />;
+      case 'bookings':
+        return <BookingsPage />;
+      case 'transactions':
+        return <TransactionsPage />;
+      case 'photo-comparisons':
+        return <PhotoComparisonsPage />;
+      case 'support':
+        return <SupportPage />;
+      default:
+        return <Dashboard onNavigate={handlePageChange} />;
+    }
   };
 
   const getPageTitle = () => {

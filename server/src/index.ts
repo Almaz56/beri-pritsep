@@ -764,21 +764,15 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
     }
 
     if (paymentResponse.Success && paymentResponse.PaymentId) {
-      // Save payment record
-      const payment = {
-        id: `payment_${Date.now()}`,
-        bookingId,
+      // Save payment record to database
+      const payment = await databaseService.createPayment({
+        bookingId: parseInt(bookingId),
         userId: user.id,
         paymentId: paymentResponse.PaymentId,
         orderId: orderId,
         amount,
-        type: paymentType,
-        status: 'PENDING' as const,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      // Payment is already created in database
+        type: paymentType === 'rental' ? 'RENTAL' : 'DEPOSIT_HOLD'
+      });
 
       logger.info('Payment created:', payment);
 
@@ -834,24 +828,23 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
       return res.status(404).json({ success: false, error: 'Payment not found' });
     }
 
-    // Update payment status
-    payment.status = Status === 'CONFIRMED' ? 'COMPLETED' : 
-                    Status === 'CANCELLED' ? 'CANCELLED' : 
-                    Status === 'REJECTED' ? 'FAILED' : 'PENDING';
-    payment.updatedAt = new Date();
+    // Update payment status in database
+    const newStatus = Status === 'CONFIRMED' ? 'COMPLETED' : 
+                     Status === 'CANCELLED' ? 'CANCELLED' : 
+                     Status === 'REJECTED' ? 'FAILED' : 'PENDING';
+    
+    await databaseService.updatePaymentStatus(payment.id, newStatus);
 
     // Update booking status
-    const booking = await databaseService.getBooking(payment.bookingId);
-    if (booking) {
-      if (payment.type === 'RENTAL' && payment.status === 'COMPLETED') {
-        booking.status = 'PAID';
-      } else if (payment.type === 'DEPOSIT_HOLD' && payment.status === 'COMPLETED') {
-        booking.status = 'ACTIVE';
+    if (newStatus === 'COMPLETED') {
+      if (payment.type === 'RENTAL') {
+        await databaseService.updateBookingStatus(payment.bookingId, 'PAID');
+      } else if (payment.type === 'DEPOSIT_HOLD') {
+        await databaseService.updateBookingStatus(payment.bookingId, 'ACTIVE');
       }
-      booking.updatedAt = new Date();
     }
 
-    logger.info('Payment status updated:', { paymentId: payment.id, status: payment.status });
+    logger.info('Payment status updated:', { paymentId: payment.id, status: newStatus });
 
     res.json({ success: true });
 

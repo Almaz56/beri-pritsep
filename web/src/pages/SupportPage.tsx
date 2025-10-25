@@ -246,11 +246,11 @@ const SupportPage: React.FC = () => {
           if (heightDifference > 150) {
             // Keyboard is visible
             setIsInputFocused(true);
-            document.body.classList.add('hide-navigation');
+            // Don't hide navigation in support page
           } else {
             // Keyboard is hidden
             setIsInputFocused(false);
-            document.body.classList.remove('hide-navigation');
+            // Don't hide navigation in support page
           }
         };
 
@@ -284,6 +284,36 @@ const SupportPage: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [chat?.messages]);
+
+  // Force navigation to be visible in support page
+  useEffect(() => {
+    const forceNavbarVisible = () => {
+      const navbar = document.querySelector('.navbar');
+      if (navbar) {
+        navbar.style.display = 'flex';
+        navbar.style.visibility = 'visible';
+        navbar.style.opacity = '1';
+        navbar.style.position = 'fixed';
+        navbar.style.bottom = '0';
+        navbar.style.left = '0';
+        navbar.style.right = '0';
+        navbar.style.zIndex = '9999999';
+      }
+      
+      // Also remove hide-navigation class from body
+      document.body.classList.remove('hide-navigation');
+    };
+
+    // Force immediately
+    forceNavbarVisible();
+
+    // Force every 100ms to override any other code
+    const interval = setInterval(forceNavbarVisible, 100);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
 
   // Убираем автообновление - оно мешает пользователю
   // useEffect(() => {
@@ -445,35 +475,21 @@ const SupportPage: React.FC = () => {
     <div className="support-page">
       <div className="support-header">
         <div className="header-content">
-          <button 
-            onClick={() => window.history.back()}
-            title="Назад"
-            style={{
-              background: 'red',
-              color: 'white',
-              border: '2px solid yellow',
-              padding: '10px',
-              fontSize: '16px',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              marginRight: '10px'
-            }}
-          >
-            ← НАЗАД
-          </button>
-          <div>
+          <div className="header-left">
             <h2>Поддержка</h2>
             <p>Мы всегда готовы помочь <span className="online-indicator">🟢</span></p>
           </div>
-          {chat && (
-            <button 
-              className="refresh-btn" 
-              onClick={loadChat}
-              title="Обновить сообщения"
-            >
-              🔄
-            </button>
-          )}
+          <div className="header-right">
+            {chat && (
+              <button 
+                className="refresh-btn" 
+                onClick={loadChat}
+                title="Обновить сообщения"
+              >
+                🔄
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
