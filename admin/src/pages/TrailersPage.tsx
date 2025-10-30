@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { trailersApi, type Trailer } from '../api';
+import { adminApi, type Trailer } from '../api';
+import { useAdminAuth } from '../contexts/AdminAuthContext';
 import QRGenerator from '../components/QRGenerator';
 import './TrailersPage.css';
 
 const TrailersPage: React.FC = () => {
+  const { token } = useAdminAuth();
   const [trailers, setTrailers] = useState<Trailer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -11,13 +13,17 @@ const TrailersPage: React.FC = () => {
   const [qrGenerator, setQrGenerator] = useState<{ type: 'TRAILER'; id: string; name: string } | null>(null);
 
   useEffect(() => {
-    loadTrailers();
-  }, []);
+    if (token) {
+      loadTrailers();
+    }
+  }, [token]);
 
   const loadTrailers = async () => {
+    if (!token) return;
+    
     try {
       setLoading(true);
-      const response = await trailersApi.getTrailers();
+      const response = await adminApi.getTrailers(token);
       if (response.success && response.data) {
         setTrailers(response.data);
       }

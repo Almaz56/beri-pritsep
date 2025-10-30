@@ -10,13 +10,15 @@ interface PaymentHandlerProps {
   paymentType: 'RENTAL' | 'DEPOSIT_HOLD';
   onSuccess?: () => void;
   onError?: (error: string) => void;
+  useTelegramMainButton?: boolean;
 }
 
 interface PaymentResponse {
   success: boolean;
   data?: {
     paymentId: string;
-    paymentUrl: string;
+    paymentUrl?: string;
+    paymentURL?: string;
   };
   error?: string;
 }
@@ -26,7 +28,8 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
   amount,
   paymentType,
   onSuccess,
-  onError
+  onError,
+  useTelegramMainButton = true
 }) => {
   const [loading, setLoading] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
@@ -34,10 +37,10 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 
-    (window.location.hostname === 'app.beripritsep.ru' 
-      ? 'https://api.beripritsep.ru/api' 
-      : 'http://localhost:8080/api');
+  const API_BASE_URL = (import.meta as any).env?.VITE_API_URL ||
+    ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:8080'
+      : 'https://api.beripritsep.ru');
 
   const createPayment = async (): Promise<PaymentResponse> => {
     const token = getAuthToken();
@@ -45,7 +48,7 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
       throw new Error('Необходимо авторизоваться');
     }
 
-    const response = await fetch(`${API_BASE_URL}/payments/create`, {
+    const response = await fetch(`${API_BASE_URL}/api/payments/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -73,36 +76,37 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
       const result = await createPayment();
       
       if (result.success && result.data) {
-        setPaymentUrl(result.data.paymentUrl);
+        const url = result.data.paymentUrl || result.data.paymentURL;
+        if (!url) {
+          throw new Error('Ссылка на оплату не получена');
+        }
+        setPaymentUrl(url);
         setPaymentStatus('waiting');
         
-        // Open payment URL in new window
-        const paymentWindow = window.open(
-          result.data.paymentUrl,
-          'payment',
-          'width=600,height=700,scrollbars=yes,resizable=yes'
-        );
-
-        if (!paymentWindow) {
-          throw new Error('Не удалось открыть окно оплаты. Проверьте блокировщик всплывающих окон.');
+        // Open payment URL using Telegram API if available, fallback to same-tab navigation
+        const tg = (window as any).Telegram?.WebApp;
+        try {
+          if (tg && typeof tg.openLink === 'function') {
+            tg.openLink(url, { try_instant_view: false });
+          } else {
+            // Same-tab navigation avoids popup blockers
+            window.location.href = url;
+          }
+        } catch {
+          // As a last resort attempt a popup
+          window.open(url, '_blank');
         }
 
         setPaymentStatus('processing');
 
-        // Monitor payment window
+        // Start polling payment status regardless of window handle availability
         const checkPaymentStatus = setInterval(async () => {
           try {
-            if (paymentWindow.closed) {
-              clearInterval(checkPaymentStatus);
-              setPaymentStatus('processing');
-              await checkPaymentResult(result.data!.paymentId);
-            }
-          } catch (error) {
-            console.error('Error checking payment status:', error);
-            setError('Ошибка проверки статуса платежа');
-            setPaymentStatus('failed');
+            await checkPaymentResult(result.data!.paymentId);
+          } catch (err) {
+            console.error('Error checking payment status:', err);
           }
-        }, 2000);
+        }, 3000);
 
         // Timeout after 10 minutes
         setTimeout(() => {
@@ -134,7 +138,7 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
   const checkPaymentResult = async (paymentId: string) => {
     try {
       const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/payments/${paymentId}/status`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -201,7 +205,7 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
   // Expose Telegram MainButton for mini-app so the user always sees an obvious Pay button
   useEffect(() => {
     // Show when actionable
-    if (!loading && (paymentStatus === 'idle' || paymentStatus === 'failed')) {
+    if (useTelegramMainButton && !loading && (paymentStatus === 'idle' || paymentStatus === 'failed')) {
       setupTelegramMainButton('Оплатить', handlePayment, {
         color: '#4CAF50',
         textColor: '#ffffff'
@@ -213,7 +217,7 @@ const PaymentHandler: React.FC<PaymentHandlerProps> = ({
       hideTelegramMainButton();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentStatus, loading]);
+  }, [paymentStatus, loading, useTelegramMainButton]);
 
   return (
     <div className="payment-handler">

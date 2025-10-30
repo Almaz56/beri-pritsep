@@ -360,6 +360,8 @@ body.hide-navigation .app-container .navbar,
   font-size: 16px;
   transition: border-color 0.2s;
   background: #f8f9fa;
+  color: #111; /* Ensure text is visible in light theme */
+  caret-color: #2481cc;
 }
 
 .message-input input:focus {
@@ -611,6 +613,8 @@ body.hide-navigation .app-container .navbar,
   font-size: 16px;
   transition: border-color 0.2s;
   background: #f8f9fa;
+  color: #111; /* Ensure text is visible while typing */
+  caret-color: #2481cc;
 }
 
 .message-input-fixed input:focus {

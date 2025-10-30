@@ -107,18 +107,19 @@ model Booking {
 }
 
 model Payment {
-  id        Int           @id @default(autoincrement())
-  bookingId Int
-  userId    Int
-  paymentId String        @unique
-  orderId   String        @unique
-  amount    Float
-  type      PaymentType
-  status    PaymentStatus @default(PENDING)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  booking   Booking       @relation(fields: [bookingId], references: [id])
-  user      User          @relation(fields: [userId], references: [id])
+  id              Int           @id @default(autoincrement())
+  bookingId       Int
+  userId          Int
+  paymentId       String        @unique
+  tinkoffPaymentId String?      @unique
+  orderId         String        @unique
+  amount          Float
+  type            PaymentType
+  status          PaymentStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  booking         Booking       @relation(fields: [bookingId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
 
   @@map("payments")
 }

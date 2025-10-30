@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import LocationPage from './pages/LocationPage';
 import TrailerPage from './pages/TrailerPage';
@@ -11,12 +11,24 @@ import DocumentUploadPage from './pages/DocumentUploadPage';
 import SupportPage from './pages/SupportPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import PaymentFailedPage from './pages/PaymentFailedPage';
+import MockPaymentPage from './pages/MockPaymentPage';
 import TestPage from './pages/TestPage';
 import './styles/App.css';
 import NavBar from './components/NavBar';
 import './styles/navbar.css';
 
 function App() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const startParam = (window as any).Telegram?.WebApp?.initDataUnsafe?.start_param;
+    if (startParam === 'payment_success') {
+      navigate('/payment/success');
+    } else if (startParam === 'payment_fail') {
+      navigate('/payment/failed');
+    }
+  }, [navigate]);
+
   return (
     <ErrorBoundary>
       <div className="app app-container">
@@ -63,6 +75,11 @@ function App() {
                           <PaymentFailedPage />
                         </ErrorBoundary>
                       } />
+          <Route path="/payment/mock" element={
+            <ErrorBoundary>
+              <MockPaymentPage />
+            </ErrorBoundary>
+          } />
                       <Route path="/test" element={<TestPage />} />
         </Routes>
         <NavBar />

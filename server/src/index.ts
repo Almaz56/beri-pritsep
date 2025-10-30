@@ -683,6 +683,55 @@ app.get('/api/profile', authenticateToken, async (req: AuthRequest, res: Respons
   }
 });
 
+// Update user profile data
+app.put('/api/profile', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Access token required'
+      });
+    }
+
+    const { firstName, lastName, middleName, passportSeries, passportNumber, passportIssuedBy, passportIssuedDate, birthDate, birthPlace, phoneNumber } = req.body;
+
+    // Update user data
+    const updatedUser = await databaseService.updateUser(parseInt(userId), {
+      firstName,
+      lastName,
+      middleName,
+      passportSeries,
+      passportNumber,
+      passportIssuedBy,
+      passportIssuedDate: passportIssuedDate ? new Date(passportIssuedDate) : null,
+      birthDate: birthDate ? new Date(birthDate) : null,
+      birthPlace,
+      phoneNumber
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: updatedUser,
+      message: 'Profile updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err: any, req: any, res: any, next: any) => {
   console.error('Error:', err);
@@ -712,7 +761,7 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
       });
     }
 
-    const booking = bookings.get(bookingId);
+    const booking = await databaseService.getBooking(parseInt(bookingId));
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -720,14 +769,37 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
       });
     }
 
-    if (booking.userId !== req.user?.id!) {
+    // Validate booking status and time window
+    if (!['PENDING_PAYMENT', 'PAID'].includes((booking as any).status)) {
+      return res.status(409).json({ success: false, error: 'Booking is not payable in current status' });
+    }
+    if (new Date(booking.startTime) <= new Date()) {
+      return res.status(409).json({ success: false, error: 'Booking start time has already passed' });
+    }
+
+    // Re-check availability window before creating payment
+    const allBookings = await databaseService.getAllBookings();
+    const hasConflict = allBookings.some(b =>
+      b.id !== booking.id &&
+      b.trailerId === booking.trailerId &&
+      b.status !== 'CANCELLED' && b.status !== 'CLOSED' &&
+      new Date(b.startTime) <= new Date(booking.endTime) &&
+      new Date(b.endTime) >= new Date(booking.startTime)
+    );
+    if (hasConflict) {
+      return res.status(409).json({ success: false, error: 'Selected time is no longer available' });
+    }
+
+    const requestUserId = parseInt(((req as any).user?.userId || (req as any).user?.id) as string);
+    if (booking.userId !== requestUserId) {
       return res.status(403).json({
         success: false,
         error: 'Access denied'
       });
     }
 
-    const user = await databaseService.getUserByTelegramId(BigInt(req.user?.id!));
+    const requestTelegramId = BigInt(((req as any).user?.telegramId || (req as any).user?.telegramID || 0).toString());
+    const user = await databaseService.getUserByTelegramId(requestTelegramId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -741,13 +813,17 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
       ? `Оплата аренды прицепа ${bookingId}`
       : `Залог за прицеп ${bookingId}`;
 
+    const botUsername = process.env['BOT_USERNAME'] || process.env['TELEGRAM_BOT_USERNAME'] || 'beripritsepbot';
+    const successDeepLink = `https://t.me/${botUsername}?startapp=payment_success`;
+    const failDeepLink = `https://t.me/${botUsername}?startapp=payment_fail`;
+
     const paymentRequest = {
       OrderId: orderId,
       Amount: amount * 100, // Tinkoff expects kopecks
       Description: description,
       CustomerKey: user.id.toString(),
-      SuccessURL: `${process.env['FRONTEND_URL'] || 'http://localhost:5173'}/payment/success`,
-      FailURL: `${process.env['FRONTEND_URL'] || 'http://localhost:5173'}/payment/fail`,
+      SuccessURL: successDeepLink,
+      FailURL: failDeepLink,
       NotificationURL: `${process.env['BACKEND_URL'] || 'http://localhost:8080'}/api/payments/webhook`,
       DATA: {
         bookingId,
@@ -769,6 +845,7 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
         bookingId: parseInt(bookingId),
         userId: user.id,
         paymentId: paymentResponse.PaymentId,
+        tinkoffPaymentId: paymentResponse.PaymentId,
         orderId: orderId,
         amount,
         type: paymentType === 'rental' ? 'RENTAL' : 'DEPOSIT_HOLD'
@@ -782,6 +859,7 @@ app.post('/api/payments/create', authenticateToken, async (req: AuthRequest, res
           paymentId: payment.id,
           tinkoffPaymentId: paymentResponse.PaymentId,
           paymentURL: paymentResponse.PaymentURL,
+          paymentUrl: paymentResponse.PaymentURL,
           amount,
           type: paymentType
         },
@@ -821,7 +899,7 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
 
     // Find payment by Tinkoff PaymentId
     const allPayments = await databaseService.getAllPayments();
-    const payment = allPayments.find(p => p.paymentId === PaymentId);
+    const payment = allPayments.find(p => p.tinkoffPaymentId === PaymentId);
     
     if (!payment) {
       logger.error('Payment not found:', PaymentId);
@@ -868,7 +946,8 @@ app.get('/api/payments/:paymentId/status', authenticateToken, async (req: AuthRe
       });
     }
 
-    if (payment.userId !== parseInt(req.user?.id!)) {
+    const requestUserId = parseInt(((req as any).user?.userId || (req as any).user?.id) as string);
+    if (payment.userId !== requestUserId) {
       return res.status(403).json({
         success: false,
         error: 'Access denied'
@@ -1582,12 +1661,23 @@ app.get('/api/admin/bookings', authenticateAdmin, requireAdmin, async (req: Admi
   try {
     // TODO: Add admin role check
     const bookingsList = await databaseService.getAllBookings();
-    
-    res.json({
-      success: true,
-      data: bookingsList,
-      message: 'Bookings retrieved successfully'
-    });
+    // Normalize BigInt and nested relations for JSON
+    const data = bookingsList.map((b: any) => ({
+      id: b.id,
+      userId: b.userId,
+      trailerId: b.trailerId,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      rentalType: b.rentalType,
+      additionalServices: b.additionalServices || {},
+      pricing: b.pricing || null,
+      status: b.status,
+      totalAmount: b.totalAmount,
+      depositAmount: b.depositAmount,
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt
+    }));
+    res.json({ success: true, data, message: 'Bookings retrieved successfully' });
   } catch (error) {
     logger.error('Admin bookings error:', error);
     res.status(500).json({

@@ -184,6 +184,9 @@ export const authApi = {
    */
   async devLogin(userId?: string): Promise<ApiResponse<{ user: User; token: string }>> {
     try {
+      console.log('🔍 Dev login attempt to:', `${API_BASE_URL}/api/auth/dev`);
+      console.log('🔍 Dev login body:', { userId });
+      
       const response = await fetch(`${API_BASE_URL}/api/auth/dev`, {
         method: 'POST',
         headers: {
@@ -192,13 +195,19 @@ export const authApi = {
         body: JSON.stringify({ userId }),
       });
 
+      console.log('🔍 Dev login response status:', response.status);
+      console.log('🔍 Dev login response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('🔍 Dev login response data:', data);
+      
+      return data;
     } catch (error) {
-      console.error('Dev login error:', error);
+      console.error('❌ Dev login error:', error);
       return {
         success: false,
         error: 'Ошибка подключения к серверу'
@@ -217,6 +226,30 @@ export const authApi = {
     const response = await fetch(`${API_BASE_URL}/api/profile`, { headers });
 
     return response.json();
+  },
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(profileData: any, token: string): Promise<ApiResponse<User>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      return await response.json();
+    } catch (error) {
+      console.error('Profile update error:', error);
+      return {
+        success: false,
+        error: 'Ошибка подключения к серверу'
+      };
+    }
   },
 };
 
@@ -1006,6 +1039,9 @@ export const supportApi = {
    */
   async getSupportChats(token: string): Promise<ApiResponse<SupportChat>> {
     try {
+      console.log('🔍 Support chat request to:', `${API_BASE_URL}/api/support/chats`);
+      console.log('🔍 Support chat token:', token ? 'present' : 'missing');
+      
       const response = await fetch(`${API_BASE_URL}/api/support/chats`, {
         method: 'GET',
         headers: {
@@ -1013,13 +1049,19 @@ export const supportApi = {
         },
       });
 
+      console.log('🔍 Support chat response status:', response.status);
+      console.log('🔍 Support chat response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('🔍 Support chat response data:', data);
+      
+      return data;
     } catch (error) {
-      console.error('Get support chat error:', error);
+      console.error('❌ Get support chat error:', error);
       return {
         success: false,
         error: 'Ошибка подключения к серверу'

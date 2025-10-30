@@ -219,6 +219,7 @@ const BookingsPage: React.FC = () => {
                     paymentType="RENTAL"
                     onSuccess={() => handlePaymentSuccess(booking.id)}
                     onError={(error) => handlePaymentError(booking.id, error)}
+                    useTelegramMainButton={false}
                   />
                 </div>
               )}
@@ -233,6 +234,7 @@ const BookingsPage: React.FC = () => {
                     paymentType="DEPOSIT_HOLD"
                     onSuccess={() => handlePaymentSuccess(booking.id)}
                     onError={(error) => handlePaymentError(booking.id, error)}
+                    useTelegramMainButton={false}
                   />
                 </div>
               )}

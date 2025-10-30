@@ -1,7 +1,7 @@
 // API client for Admin Panel
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 
   (window.location.hostname === 'admin.beripritsep.ru' 
-    ? 'https://api.beripritsep.ru/api' 
+    ? 'https://admin.beripritsep.ru/api' 
     : 'http://localhost:8080/api');
 
 // Helper function to get auth headers

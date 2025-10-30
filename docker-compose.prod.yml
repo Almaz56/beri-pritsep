@@ -19,9 +19,10 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
       - ALLOW_DEV_AUTH=${ALLOW_DEV_AUTH:-false}
-      - TINKOFF_TERMINAL_KEY=${TINKOFF_TERMINAL_KEY}
-      - TINKOFF_SECRET_KEY=${TINKOFF_SECRET_KEY}
-      - TINKOFF_SANDBOX=${TINKOFF_SANDBOX:-true}
+      - TINKOFF_TERMINAL_KEY=1756374440021DEMO
+      - TINKOFF_SECRET_KEY=DeBFGLzQ95xh_Qgz
+      - TINKOFF_SANDBOX=false
+      - TINKOFF_FORCE_MOCK=${TINKOFF_FORCE_MOCK:-false}
       - FRONTEND_URL=${FRONTEND_URL:-https://app.beripritsep.ru}
       - BACKEND_URL=${BACKEND_URL:-https://api.beripritsep.ru}
       - UPLOAD_PATH=/app/uploads
@@ -60,11 +61,11 @@ services:
       context: ./admin
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=https://api.beripritsep.ru/api
+        - VITE_API_URL=https://admin.beripritsep.ru/api
     container_name: trailer-go-admin
     restart: unless-stopped
     environment:
-      - VITE_API_URL=https://api.beripritsep.ru/api
+      - VITE_API_URL=https://admin.beripritsep.ru/api
     ports:
       - "3001:80"
     networks:

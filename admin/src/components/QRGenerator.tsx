@@ -19,18 +19,21 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ type, id, name, onClose }) =>
     setError(null);
 
     try {
-      // Call real API
-      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 
-        (window.location.hostname === 'admin.beripritsep.ru' 
-          ? 'https://api.beripritsep.ru/api' 
-          : 'http://localhost:8080/api');
+      // Call real API - always use direct server URL in development
+      const API_BASE_URL = window.location.hostname === 'admin.beripritsep.ru' 
+        ? 'https://api.beripritsep.ru/api' 
+        : 'http://localhost:8080/api';
       
       const endpoint = type === 'LOCATION' 
         ? `${API_BASE_URL}/qr/location/${id}`
         : `${API_BASE_URL}/qr/trailer/${id}`;
       
+      console.log('QR API endpoint:', endpoint);
+      
       const response = await fetch(endpoint);
       const data = await response.json();
+      
+      console.log('QR API response:', data);
 
       if (data.success && data.data) {
         setQrCode(data.data.qrCode);

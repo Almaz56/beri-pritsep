@@ -15,42 +15,55 @@ interface Booking {
   updatedAt: Date;
 }
 
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-}
-
-interface Trailer {
-  id: string;
-  name: string;
-}
-
-const mockBookings: Booking[] = [];
-
-const mockUsers: User[] = [];
-const mockTrailers: Trailer[] = [];
+// User/Trailer данные не используются на странице — минимальные типы опущены
 
 const BookingsPage: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'PENDING_PAYMENT' | 'PAID' | 'ACTIVE' | 'RETURNED' | 'CLOSED' | 'CANCELLED'>('ALL');
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  // const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  // const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     loadBookings();
   }, []);
 
+  const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
+
   const loadBookings = async () => {
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setBookings(mockBookings);
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setBookings([]);
+        return;
+      }
+      const res = await fetch(`${API_BASE_URL}/admin/bookings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+      const result = await res.json();
+      if (!res.ok || !result?.success) {
+        throw new Error(result?.error || `Failed to load bookings: ${res.status}`);
+      }
+      const mapped: Booking[] = (result.data || []).map((b: any) => ({
+        id: String(b.id),
+        userId: String(b.userId),
+        trailerId: String(b.trailerId),
+        startTime: new Date(b.startTime),
+        endTime: new Date(b.endTime),
+        rentalType: (b.rentalType || 'HOURLY') as any,
+        additionalServices: b.additionalServices || { pickup: false },
+        pricing: b.pricing || { baseCost: 0, additionalCost: 0, deposit: 0, total: b.totalAmount || 0 },
+        status: b.status,
+        createdAt: new Date(b.createdAt),
+        updatedAt: new Date(b.updatedAt),
+      }));
+      setBookings(mapped);
     } catch (error) {
       console.error('Error loading bookings:', error);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
@@ -62,12 +75,11 @@ const BookingsPage: React.FC = () => {
         ? { ...booking, status: newStatus, updatedAt: new Date() }
         : booking
     ));
-    alert(`Статус бронирования изменен на: ${getStatusText(newStatus)} (mock)`);
+    alert(`Статус бронирования изменен на: ${getStatusText(newStatus)} (локальное отображение)`);
   };
 
   const handleViewDetails = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setShowDetailsModal(true);
+    console.log('Booking details:', booking);
   };
 
   const getStatusColor = (status: Booking['status']) => {
@@ -89,43 +101,19 @@ const BookingsPage: React.FC = () => {
     }
   };
 
-  const getStatusText = (status: Booking['status']) => {
-    switch (status) {
-      case 'PENDING_PAYMENT':
-        return 'Ожидает оплаты';
-      case 'PAID':
-        return 'Оплачено';
-      case 'ACTIVE':
-        return 'Активно';
-      case 'RETURNED':
-        return 'Возвращено';
-      case 'CLOSED':
-        return 'Завершено';
-      case 'CANCELLED':
-        return 'Отменено';
-      default:
-        return 'Неизвестно';
-    }
-  };
-
-  const getUserName = (userId: string) => {
-    const user = mockUsers.find(u => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}` : 'Неизвестный пользователь';
-  };
-
-  const getTrailerName = (trailerId: string) => {
-    const trailer = mockTrailers.find(t => t.id === trailerId);
-    return trailer ? trailer.name : 'Неизвестный прицеп';
-  };
-
-  const filteredBookings = bookings.filter(booking => {
-    if (filter === 'ALL') return true;
-    return booking.status === filter;
-  });
+  const getStatusText = (status: Booking['status']) =>
+    status === 'PENDING_PAYMENT' ? 'Ожидает оплаты'
+    : status === 'PAID' ? 'Оплачено'
+    : status === 'ACTIVE' ? 'Активно'
+    : status === 'RETURNED' ? 'Возвращено'
+    : status === 'CLOSED' ? 'Завершено'
+    : status === 'CANCELLED' ? 'Отменено' : status;
 
   if (loading) {
-    return <div className="admin-bookings-page loading">Загрузка бронирований...</div>;
+    return <div className="admin-bookings-page"><div className="loading">Загрузка бронирований...</div></div>;
   }
+
+  const filtered = filter === 'ALL' ? bookings : bookings.filter(b => b.status === filter);
 
   return (
     <div className="admin-bookings-page">
@@ -151,172 +139,47 @@ const BookingsPage: React.FC = () => {
       <div className="bookings-stats">
         <div className="stat-card">
           <h3>Всего бронирований</h3>
-          <span className="stat-number">{bookings.length}</span>
+          <span className="stat-number">{filtered.length}</span>
         </div>
         <div className="stat-card">
           <h3>Активные</h3>
-          <span className="stat-number">{bookings.filter(b => b.status === 'ACTIVE').length}</span>
+          <span className="stat-number">{filtered.filter(b => b.status === 'ACTIVE').length}</span>
         </div>
         <div className="stat-card">
           <h3>Ожидают оплаты</h3>
-          <span className="stat-number">{bookings.filter(b => b.status === 'PENDING_PAYMENT').length}</span>
+          <span className="stat-number">{filtered.filter(b => b.status === 'PENDING_PAYMENT').length}</span>
         </div>
         <div className="stat-card">
           <h3>Завершены</h3>
-          <span className="stat-number">{bookings.filter(b => b.status === 'CLOSED').length}</span>
+          <span className="stat-number">{filtered.filter(b => b.status === 'CLOSED').length}</span>
         </div>
       </div>
 
       <div className="bookings-list">
-        {filteredBookings.map(booking => (
+        {filtered.map(booking => (
           <div key={booking.id} className="booking-item">
-            <div className="booking-info">
-              <div className="booking-header">
-                <h3>Бронирование #{booking.id}</h3>
-                <span 
-                  className="status-badge"
-                  style={{ backgroundColor: getStatusColor(booking.status) }}
-                >
-                  {getStatusText(booking.status)}
-                </span>
-              </div>
-              
-              <div className="booking-details">
-                <div className="detail-row">
-                  <span className="label">Клиент:</span>
-                  <span className="value">{getUserName(booking.userId)}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="label">Прицеп:</span>
-                  <span className="value">{getTrailerName(booking.trailerId)}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="label">Период:</span>
-                  <span className="value">
-                    {booking.startTime.toLocaleString('ru-RU')} - {booking.endTime.toLocaleString('ru-RU')}
-                  </span>
-                </div>
-                <div className="detail-row">
-                  <span className="label">Тип аренды:</span>
-                  <span className="value">{booking.rentalType === 'HOURLY' ? 'Почасовая' : 'Посуточная'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="label">Доп. услуги:</span>
-                  <span className="value">{booking.additionalServices.pickup ? 'Забор прицепа' : 'Нет'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="label">Сумма:</span>
-                  <span className="value total-amount">{booking.pricing.total}₽</span>
-                </div>
-                <div className="detail-row">
-                  <span className="label">Создано:</span>
-                  <span className="value">{booking.createdAt.toLocaleString('ru-RU')}</span>
-                </div>
+            <div className="booking-header">
+              <div className="booking-id">Бронь #{booking.id}</div>
+              <span className="status-badge" style={{ background: getStatusColor(booking.status) }}>
+                {getStatusText(booking.status)}
+              </span>
+            </div>
+            <div className="booking-body">
+              <div className="details">
+                <div className="detail-row"><span className="label">Пользователь:</span> <span className="value">{booking.userId}</span></div>
+                <div className="detail-row"><span className="label">Прицеп:</span> <span className="value">{booking.trailerId}</span></div>
+                <div className="detail-row"><span className="label">Период:</span> <span className="value">{booking.startTime.toLocaleString('ru-RU')} — {booking.endTime.toLocaleString('ru-RU')}</span></div>
+                <div className="detail-row"><span className="label">Сумма:</span> <span className="value total-amount">{booking.pricing.total}₽</span></div>
               </div>
             </div>
-
             <div className="booking-actions">
-              <button 
-                className="details-button"
-                onClick={() => handleViewDetails(booking)}
-              >
-                Подробности
-              </button>
-              
-              {booking.status === 'PENDING_PAYMENT' && (
-                <>
-                  <button 
-                    className="approve-button"
-                    onClick={() => handleStatusChange(booking.id, 'PAID')}
-                  >
-                    Подтвердить оплату
-                  </button>
-                  <button 
-                    className="cancel-button"
-                    onClick={() => handleStatusChange(booking.id, 'CANCELLED')}
-                  >
-                    Отменить
-                  </button>
-                </>
-              )}
-              
-              {booking.status === 'PAID' && (
-                <button 
-                  className="activate-button"
-                  onClick={() => handleStatusChange(booking.id, 'ACTIVE')}
-                >
-                  Активировать
-                </button>
-              )}
-              
-              {booking.status === 'ACTIVE' && (
-                <button 
-                  className="return-button"
-                  onClick={() => handleStatusChange(booking.id, 'RETURNED')}
-                >
-                  Отметить возврат
-                </button>
-              )}
-              
-              {booking.status === 'RETURNED' && (
-                <button 
-                  className="close-button"
-                  onClick={() => handleStatusChange(booking.id, 'CLOSED')}
-                >
-                  Завершить
-                </button>
-              )}
+              <button className="details-button" onClick={() => handleViewDetails(booking)}>Подробности</button>
+              <button className="approve-button" onClick={() => handleStatusChange(booking.id, 'PAID')}>Подтвердить оплату</button>
+              <button className="cancel-button" onClick={() => handleStatusChange(booking.id, 'CANCELLED')}>Отменить</button>
             </div>
           </div>
         ))}
       </div>
-
-      {showDetailsModal && selectedBooking && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h2>Детали бронирования #{selectedBooking.id}</h2>
-              <button 
-                className="close-button"
-                onClick={() => setShowDetailsModal(false)}
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="modal-content">
-              <div className="booking-details-full">
-                <div className="detail-section">
-                  <h3>Информация о клиенте</h3>
-                  <p><strong>Имя:</strong> {getUserName(selectedBooking.userId)}</p>
-                  <p><strong>Телефон:</strong> {mockUsers.find(u => u.id === selectedBooking.userId)?.phone || 'Не указан'}</p>
-                </div>
-                
-                <div className="detail-section">
-                  <h3>Информация о прицепе</h3>
-                  <p><strong>Название:</strong> {getTrailerName(selectedBooking.trailerId)}</p>
-                </div>
-                
-                <div className="detail-section">
-                  <h3>Детали аренды</h3>
-                  <p><strong>Начало:</strong> {selectedBooking.startTime.toLocaleString('ru-RU')}</p>
-                  <p><strong>Окончание:</strong> {selectedBooking.endTime.toLocaleString('ru-RU')}</p>
-                  <p><strong>Тип:</strong> {selectedBooking.rentalType === 'HOURLY' ? 'Почасовая' : 'Посуточная'}</p>
-                  <p><strong>Забор прицепа:</strong> {selectedBooking.additionalServices.pickup ? 'Да' : 'Нет'}</p>
-                </div>
-                
-                <div className="detail-section">
-                  <h3>Финансовая информация</h3>
-                  <p><strong>Базовая стоимость:</strong> {selectedBooking.pricing.baseCost}₽</p>
-                  <p><strong>Дополнительные услуги:</strong> {selectedBooking.pricing.additionalCost}₽</p>
-                  <p><strong>Залог:</strong> {selectedBooking.pricing.deposit}₽</p>
-                  <p><strong>Итого:</strong> {selectedBooking.pricing.total}₽</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

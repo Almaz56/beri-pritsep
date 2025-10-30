@@ -73,16 +73,18 @@ class TinkoffService {
   private secretKey: string;
   private baseURL: string;
   private isSandbox: boolean;
+  private forceMock: boolean;
 
   constructor() {
     this.terminalKey = process.env['TINKOFF_TERMINAL_KEY'] || '';
     this.secretKey = process.env['TINKOFF_SECRET_KEY'] || '';
     this.isSandbox = process.env['TINKOFF_SANDBOX'] === 'true';
+    this.forceMock = process.env['TINKOFF_FORCE_MOCK'] === 'true';
     this.baseURL = this.isSandbox 
       ? 'https://rest-api-test.tinkoff.ru/v2'
       : 'https://securepay.tinkoff.ru/v2';
     
-    if (!this.terminalKey || !this.secretKey) {
+    if (!this.terminalKey || !this.secretKey || this.forceMock) {
       logger.warn('Tinkoff credentials not configured, using mock mode');
     }
   }
@@ -91,21 +93,30 @@ class TinkoffService {
    * Generate token for Tinkoff API request
    */
   private generateToken(data: Record<string, any>): string {
-    const sortedData = Object.keys(data)
-      .sort()
-      .reduce((result, key) => {
-        result[key] = data[key];
-        return result as TinkoffPaymentResponse;
-      }, {} as Record<string, any>);
+    // Алгоритм Tinkoff:
+    // 1) Удалить Token
+    // 2) Добавить Password=SecretKey в набор параметров
+    // 3) Отсортировать ключи по алфавиту
+    // 4) Сконкатенировать ТОЛЬКО значения (без ключей), игнорируя объекты/массивы
+    // 5) SHA256 от полученной строки
+    const params: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (k === 'Token') continue;
+      if (v === undefined || v === null || v === '') continue;
+      params[k] = v;
+    }
+    // Важный момент: секрет добавляется как параметр Password
+    params['Password'] = this.secretKey;
 
-    const dataString = Object.entries(sortedData)
-      .map(([key, value]) => `${key}=${value}`)
+    const orderedKeys = Object.keys(params).sort();
+    const concatenated = orderedKeys
+      .map(k => {
+        const v = params[k];
+        return typeof v === 'object' ? '' : String(v);
+      })
       .join('');
 
-    return crypto
-      .createHash('sha256')
-      .update(dataString + this.secretKey)
-      .digest('hex');
+    return crypto.createHash('sha256').update(concatenated).digest('hex');
   }
 
   /**
@@ -121,7 +132,7 @@ class TinkoffService {
    * Create payment for rental
    */
   public async createPayment(request: TinkoffPaymentRequest): Promise<TinkoffPaymentResponse> {
-    if (!this.terminalKey || !this.secretKey) {
+    if (!this.terminalKey || !this.secretKey || this.forceMock) {
       return this.createMockPayment(request);
     }
 
@@ -142,21 +153,25 @@ class TinkoffService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'BeriPritsepServer/1.0 (+https://api.beripritsep.ru)'
         },
         body: JSON.stringify(requestData),
       });
 
-      const result = await response.json();
-      logger.info('Tinkoff payment created:', result);
-      return result as TinkoffPaymentResponse;
+      const raw = await response.text();
+      let parsed: any;
+      try { parsed = JSON.parse(raw); } catch { parsed = { Success: false, Message: `Bad JSON: ${raw}` }; }
+      if (!response.ok) {
+        logger.error('Tinkoff Init HTTP error:', response.status, raw);
+      } else {
+        logger.info('Tinkoff payment created:', parsed);
+      }
+      return parsed as TinkoffPaymentResponse;
 
     } catch (error) {
       logger.error('Tinkoff payment creation error:', error);
-      return {
-        Success: false,
-        ErrorCode: 'NETWORK_ERROR',
-        Message: 'Network error occurred'
-      };
+      return { Success: false, ErrorCode: 'NETWORK_ERROR', Message: 'Network error occurred' };
     }
   }
 
@@ -164,7 +179,7 @@ class TinkoffService {
    * Create HOLD for deposit
    */
   public async createHold(request: TinkoffHoldRequest): Promise<TinkoffHoldResponse> {
-    if (!this.terminalKey || !this.secretKey) {
+    if (!this.terminalKey || !this.secretKey || this.forceMock) {
       return this.createMockHold(request);
     }
 
@@ -175,7 +190,7 @@ class TinkoffService {
         OrderId: request.OrderId,
         Description: request.Description,
         CustomerKey: request.CustomerKey,
-        PayType: 'H', // HOLD type
+        PayType: 'T', // HOLD (two-stage payment)
         ...request
       };
 
@@ -186,21 +201,25 @@ class TinkoffService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'BeriPritsepServer/1.0 (+https://api.beripritsep.ru)'
         },
         body: JSON.stringify(requestData),
       });
 
-      const result = await response.json();
-      logger.info('Tinkoff hold created:', result);
-      return result as TinkoffPaymentResponse;
+      const raw = await response.text();
+      let parsed: any;
+      try { parsed = JSON.parse(raw); } catch { parsed = { Success: false, Message: `Bad JSON: ${raw}` }; }
+      if (!response.ok) {
+        logger.error('Tinkoff Hold Init HTTP error:', response.status, raw);
+      } else {
+        logger.info('Tinkoff hold created:', parsed);
+      }
+      return parsed as TinkoffPaymentResponse;
 
     } catch (error) {
       logger.error('Tinkoff hold creation error:', error);
-      return {
-        Success: false,
-        ErrorCode: 'NETWORK_ERROR',
-        Message: 'Network error occurred'
-      };
+      return { Success: false, ErrorCode: 'NETWORK_ERROR', Message: 'Network error occurred' };
     }
   }
 
@@ -208,7 +227,7 @@ class TinkoffService {
    * Release HOLD (confirm payment)
    */
   public async releaseHold(paymentId: string, amount: number): Promise<TinkoffPaymentResponse> {
-    if (!this.terminalKey || !this.secretKey) {
+    if (!this.terminalKey || !this.secretKey || this.forceMock) {
       return this.createMockReleaseHold(paymentId, amount);
     }
 
@@ -236,11 +255,7 @@ class TinkoffService {
 
     } catch (error) {
       logger.error('Tinkoff hold release error:', error);
-      return {
-        Success: false,
-        ErrorCode: 'NETWORK_ERROR',
-        Message: 'Network error occurred'
-      };
+      return { Success: false, ErrorCode: 'NETWORK_ERROR', Message: 'Network error occurred' };
     }
   }
 
@@ -248,7 +263,7 @@ class TinkoffService {
    * Cancel HOLD
    */
   public async cancelHold(paymentId: string): Promise<TinkoffPaymentResponse> {
-    if (!this.terminalKey || !this.secretKey) {
+    if (!this.terminalKey || !this.secretKey || this.forceMock) {
       return this.createMockCancelHold(paymentId);
     }
 
@@ -275,11 +290,7 @@ class TinkoffService {
 
     } catch (error) {
       logger.error('Tinkoff hold cancellation error:', error);
-      return {
-        Success: false,
-        ErrorCode: 'NETWORK_ERROR',
-        Message: 'Network error occurred'
-      };
+      return { Success: false, ErrorCode: 'NETWORK_ERROR', Message: 'Network error occurred' };
     }
   }
 
@@ -287,7 +298,7 @@ class TinkoffService {
    * Confirm HOLD (retain deposit)
    */
   public async confirmHold(paymentId: string): Promise<TinkoffPaymentResponse> {
-    if (!this.terminalKey || !this.secretKey) {
+    if (!this.terminalKey || !this.secretKey || this.forceMock) {
       return this.createMockConfirmHold(paymentId);
     }
 
@@ -314,11 +325,7 @@ class TinkoffService {
 
     } catch (error) {
       logger.error('Tinkoff hold confirmation error:', error);
-      return {
-        Success: false,
-        ErrorCode: 'NETWORK_ERROR',
-        Message: 'Network error occurred'
-      };
+      return { Success: false, ErrorCode: 'NETWORK_ERROR', Message: 'Network error occurred' };
     }
   }
 
@@ -326,7 +333,7 @@ class TinkoffService {
    * Get payment status
    */
   public async getPaymentStatus(paymentId: string): Promise<TinkoffPaymentResponse> {
-    if (!this.terminalKey || !this.secretKey) {
+    if (!this.terminalKey || !this.secretKey || this.forceMock) {
       return this.createMockPaymentStatus(paymentId);
     }
 
@@ -364,27 +371,32 @@ class TinkoffService {
   // Mock methods for development
   private createMockPayment(request: TinkoffPaymentRequest): TinkoffPaymentResponse {
     logger.info('Creating mock payment:', request);
+    const frontendUrl = process.env['FRONTEND_URL'] || 'http://localhost:5173';
+    const pid = `mock_payment_${Date.now()}`;
     return {
       Success: true,
       TerminalKey: 'mock-terminal',
       Status: 'NEW',
-      PaymentId: `mock_payment_${Date.now()}`,
+      PaymentId: pid,
       OrderId: request.OrderId,
       Amount: request.Amount,
-      PaymentURL: `https://mock-payment.tinkoff.ru/pay?paymentId=mock_payment_${Date.now()}`
+      // Используем внутренний URL фронтенда, чтобы не блокировалось в Telegram
+      PaymentURL: `${frontendUrl}/payment/mock?paymentId=${pid}`
     };
   }
 
   private createMockHold(request: TinkoffHoldRequest): TinkoffHoldResponse {
     logger.info('Creating mock hold:', request);
+    const frontendUrl = process.env['FRONTEND_URL'] || 'http://localhost:5173';
+    const pid = `mock_hold_${Date.now()}`;
     return {
       Success: true,
       TerminalKey: 'mock-terminal',
       Status: 'NEW',
-      PaymentId: `mock_hold_${Date.now()}`,
+      PaymentId: pid,
       OrderId: request.OrderId,
       Amount: request.Amount,
-      PaymentURL: `https://mock-payment.tinkoff.ru/hold?paymentId=mock_hold_${Date.now()}`
+      PaymentURL: `${frontendUrl}/payment/mock?paymentId=${pid}`
     };
   }
 

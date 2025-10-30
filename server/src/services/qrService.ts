@@ -66,6 +66,21 @@ class QRService {
   }
 
   /**
+   * Generate QR code for any URL
+   */
+  async generateQRCode(url: string): Promise<string> {
+    try {
+      const dataUrl = await QRCode.toDataURL(url, this.defaultOptions);
+      logger.info(`Generated QR code for URL: ${url.substring(0, 50)}...`);
+      
+      return dataUrl;
+    } catch (error) {
+      logger.error('Error generating QR code:', error);
+      throw new Error('Failed to generate QR code');
+    }
+  }
+
+  /**
    * Generate QR code for a trailer
    */
   async generateTrailerQR(trailerId: string, trailerName: string): Promise<{ dataUrl: string; url: string }> {

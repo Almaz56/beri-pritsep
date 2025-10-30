@@ -17,6 +17,7 @@ interface AuthRequest extends Request {
 }
 import { adminService } from './services/adminService';
 import { databaseService } from './services/databaseService';
+import { qrService } from './services/qrService';
 import { authenticateAdmin, AdminRequest, requireAdmin } from './middleware/adminAuth';
 import jwt from 'jsonwebtoken';
 import { verifyInitData, getDevUser } from './verifyInitData';
@@ -405,7 +406,22 @@ app.get('/api/admin/users', authenticateAdmin, requireAdmin, async (req: AdminRe
 app.get('/api/admin/bookings', authenticateAdmin, requireAdmin, async (req: AdminRequest, res) => {
   try {
     const bookingsList = await databaseService.getAllBookings();
-    res.json({ success: true, data: bookingsList, message: 'Bookings retrieved successfully' });
+    const data = bookingsList.map((b: any) => ({
+      id: b.id,
+      userId: b.userId,
+      trailerId: b.trailerId,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      rentalType: b.rentalType,
+      additionalServices: b.additionalServices || {},
+      pricing: b.pricing || null,
+      status: b.status,
+      totalAmount: b.totalAmount,
+      depositAmount: b.depositAmount,
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt
+    }));
+    res.json({ success: true, data, message: 'Bookings retrieved successfully' });
   } catch (error) {
     console.error('Admin bookings error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -735,6 +751,190 @@ app.get('/api/trailers/:id', async (req, res) => {
   }
 });
 
+// Payment endpoints (production)
+app.post('/api/payments/create', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { bookingId, paymentType } = req.body; // 'rental' or 'deposit'
+
+    if (!bookingId || !paymentType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: bookingId, paymentType'
+      });
+    }
+
+    const booking = await databaseService.getBooking(parseInt(bookingId));
+    if (!booking) {
+      return res.status(404).json({ success: false, error: 'Booking not found' });
+    }
+
+    // Validate booking status and time window
+    if (!['PENDING_PAYMENT', 'PAID'].includes((booking as any).status)) {
+      return res.status(409).json({ success: false, error: 'Booking is not payable in current status' });
+    }
+    if (new Date((booking as any).startTime) <= new Date()) {
+      return res.status(409).json({ success: false, error: 'Booking start time has already passed' });
+    }
+
+    // Re-check availability window before creating payment
+    const allBookings = await databaseService.getAllBookings();
+    const hasConflict = allBookings.some((b: any) =>
+      b.id !== booking.id &&
+      b.trailerId === booking.trailerId &&
+      b.status !== 'CANCELLED' && b.status !== 'CLOSED' &&
+      new Date(b.startTime) <= new Date(booking.endTime) &&
+      new Date(b.endTime) >= new Date(booking.startTime)
+    );
+    if (hasConflict) {
+      return res.status(409).json({ success: false, error: 'Selected time is no longer available' });
+    }
+
+    const requestUserId = parseInt((req.user?.userId || req.user?.id) as string);
+    if (booking.userId !== requestUserId) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    const user = await databaseService.getUserById(requestUserId.toString());
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const amount = paymentType === 'rental' ? booking.totalAmount : booking.depositAmount;
+    const orderId = `${paymentType}_${bookingId}_${Date.now()}`;
+    const description = paymentType === 'rental' 
+      ? `Оплата аренды прицепа ${bookingId}`
+      : `Залог за прицеп ${bookingId}`;
+
+    const botUsername = process.env['BOT_USERNAME'] || process.env['TELEGRAM_BOT_USERNAME'] || 'beripritsepbot';
+    const successDeepLink = `https://t.me/${botUsername}?startapp=payment_success`;
+    const failDeepLink = `https://t.me/${botUsername}?startapp=payment_fail`;
+
+    const paymentRequest: any = {
+      OrderId: orderId,
+      Amount: amount * 100,
+      Description: description,
+      CustomerKey: user.id.toString(),
+      SuccessURL: successDeepLink,
+      FailURL: failDeepLink,
+      NotificationURL: `${process.env['BACKEND_URL'] || 'http://localhost:8080'}/api/payments/webhook`,
+      DATA: { bookingId, paymentType, userId: user.id.toString() }
+    };
+
+    let paymentResponse;
+    if (paymentType === 'rental') {
+      paymentResponse = await tinkoffService.createPayment(paymentRequest);
+    } else {
+      paymentResponse = await tinkoffService.createHold(paymentRequest);
+    }
+
+    if (paymentResponse.Success && paymentResponse.PaymentId) {
+      const payment = await databaseService.createPayment({
+        bookingId: parseInt(bookingId),
+        userId: user.id,
+        paymentId: paymentResponse.PaymentId!,
+        tinkoffPaymentId: paymentResponse.PaymentId!,
+        orderId,
+        amount,
+        type: paymentType === 'rental' ? 'RENTAL' : 'DEPOSIT_HOLD'
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          paymentId: payment.id,
+          tinkoffPaymentId: paymentResponse.PaymentId,
+          paymentURL: paymentResponse.PaymentURL,
+          paymentUrl: paymentResponse.PaymentURL,
+          amount,
+          type: paymentType
+        },
+        message: 'Payment created successfully'
+      });
+    }
+
+    console.error('Payment creation failed:', paymentResponse);
+    return res.status(500).json({ success: false, error: paymentResponse.Message || 'Payment creation failed' });
+
+  } catch (error: any) {
+    console.error('Payment creation error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Tinkoff webhook endpoint (raw body)
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }) as any, async (req: any, res: any) => {
+  try {
+    const webhookData = JSON.parse(req.body.toString());
+
+    // Verify webhook token
+    if (!tinkoffService.verifyWebhookToken(webhookData)) {
+      return res.status(400).json({ success: false, error: 'Invalid token' });
+    }
+
+    const { PaymentId, Status } = webhookData;
+
+    const allPayments = await databaseService.getAllPayments();
+    const payment = allPayments.find(p => p.tinkoffPaymentId === PaymentId);
+    if (!payment) {
+      return res.status(404).json({ success: false, error: 'Payment not found' });
+    }
+
+    const newStatus = Status === 'CONFIRMED' ? 'COMPLETED' : 
+                     Status === 'CANCELLED' ? 'CANCELLED' : 
+                     Status === 'REJECTED' ? 'FAILED' : 'PENDING';
+    await databaseService.updatePaymentStatus(payment.tinkoffPaymentId, newStatus as any);
+
+    if (newStatus === 'COMPLETED') {
+      if (payment.type === 'RENTAL') await databaseService.updateBookingStatus(payment.bookingId, 'PAID');
+      if (payment.type === 'DEPOSIT_HOLD') await databaseService.updateBookingStatus(payment.bookingId, 'ACTIVE');
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+    return res.status(500).json({ success: false, error: 'Webhook processing failed' });
+  }
+});
+
+// Get payment status
+app.get('/api/payments/:paymentId/status', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { paymentId } = req.params as { paymentId: string };
+    const allPayments = await databaseService.getAllPayments();
+    const payment = allPayments.find(p => p.id.toString() === paymentId);
+    if (!payment) {
+      return res.status(404).json({ success: false, error: 'Payment not found' });
+    }
+    const requestUserId = parseInt((req.user?.userId || req.user?.id) as string);
+    if (payment.userId !== requestUserId) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    const tinkoffStatus = await tinkoffService.getPaymentStatus(payment.paymentId);
+    if (tinkoffStatus.Success) {
+      payment.status = tinkoffStatus.Status === 'CONFIRMED' ? 'COMPLETED' : 
+                       tinkoffStatus.Status === 'CANCELLED' ? 'CANCELLED' : 
+                       tinkoffStatus.Status === 'REJECTED' ? 'FAILED' : 'PENDING';
+      payment.updatedAt = new Date();
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        paymentId: payment.id,
+        status: payment.status,
+        amount: payment.amount,
+        type: payment.type,
+        createdAt: payment.createdAt,
+        updatedAt: payment.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Payment status error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 // Public API endpoints for locations
 app.get('/api/locations', async (req, res) => {
   try {
@@ -1031,6 +1231,127 @@ app.get('/api/profile', authenticateToken, async (req: any, res: any) => {
     res.status(500).json({
       success: false,
       error: 'Internal server error'
+    });
+  }
+});
+
+// Get user payments
+app.get('/api/payments/user/:userId', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { userId } = req.params as { userId: string };
+    
+    if (parseInt(userId) !== parseInt(req.user?.userId!)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+
+    const allPayments = await databaseService.getAllPayments();
+    const userPayments = allPayments.filter(p => p.userId === parseInt(userId));
+
+    res.json({
+      success: true,
+      data: userPayments.map(payment => ({
+        id: payment.id,
+        bookingId: payment.bookingId,
+        amount: payment.amount,
+        type: payment.type,
+        status: payment.status,
+        createdAt: payment.createdAt,
+        updatedAt: payment.updatedAt
+      }))
+    });
+
+  } catch (error) {
+    console.error('User payments error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve payments'
+    });
+  }
+});
+
+// QR Code API endpoints
+
+// Generate QR code for trailer
+app.get('/api/qr/trailer/:trailerId', async (req, res) => {
+  try {
+    const { trailerId } = req.params;
+    
+    // Get trailer info
+    const trailer = await databaseService.getTrailer(parseInt(trailerId));
+    if (!trailer) {
+      return res.status(404).json({
+        success: false,
+        error: 'Trailer not found'
+      });
+    }
+
+    // Generate QR code URL
+    const qrUrl = `https://t.me/beripritsepbot?startapp=trailer_${trailerId}`;
+    
+    // Generate QR code image
+    const qrCode = await qrService.generateQRCode(qrUrl);
+    
+    res.json({
+      success: true,
+      data: {
+        trailerId,
+        trailerName: trailer.name,
+        qrCode,
+        url: qrUrl,
+        type: 'TRAILER'
+      },
+      message: 'QR code generated successfully'
+    });
+
+  } catch (error) {
+    console.error('QR generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate QR code'
+    });
+  }
+});
+
+// Generate QR code for location
+app.get('/api/qr/location/:locationId', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    
+    // Get location info
+    const location = await databaseService.getLocation(parseInt(locationId));
+    if (!location) {
+      return res.status(404).json({
+        success: false,
+        error: 'Location not found'
+      });
+    }
+
+    // Generate QR code URL
+    const qrUrl = `https://t.me/beripritsepbot?startapp=location_${locationId}`;
+    
+    // Generate QR code image
+    const qrCode = await qrService.generateQRCode(qrUrl);
+    
+    res.json({
+      success: true,
+      data: {
+        locationId,
+        locationName: location.name,
+        qrCode,
+        url: qrUrl,
+        type: 'LOCATION'
+      },
+      message: 'QR code generated successfully'
+    });
+
+  } catch (error) {
+    console.error('QR generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate QR code'
     });
   }
 });

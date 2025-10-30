@@ -240,6 +240,7 @@ export class DatabaseService {
     bookingId: number;
     userId: number;
     paymentId: string;
+    tinkoffPaymentId: string;
     orderId: string;
     amount: number;
     type: 'RENTAL' | 'DEPOSIT_HOLD';
@@ -249,6 +250,7 @@ export class DatabaseService {
         bookingId: paymentData.bookingId,
         userId: paymentData.userId,
         paymentId: paymentData.paymentId,
+        tinkoffPaymentId: paymentData.tinkoffPaymentId,
         orderId: paymentData.orderId,
         amount: paymentData.amount,
         type: paymentData.type as any,

@@ -13,6 +13,7 @@ const SupportPage: React.FC = () => {
     return savedChatId ? { id: parseInt(savedChatId) } as SupportChat : null;
   });
   const [newMessage, setNewMessage] = useState('');
+  const [attachmentsPreview, setAttachmentsPreview] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -103,12 +104,7 @@ const SupportPage: React.FC = () => {
         console.log('🚫 Blocking update - user is typing');
         return;
       }
-      
-      // Don't update if it's an admin message (we already have it locally)
-      if (message.senderType === 'ADMIN') {
-        console.log('🚫 Blocking update - admin message already exists locally');
-        return;
-      }
+      // Для ADMIN-сообщения пробуем заменить временное по контенту
       
       const now = Date.now();
       const timeSinceLastUpdate = now - lastMessageTimeRef.current;
@@ -121,20 +117,24 @@ const SupportPage: React.FC = () => {
       lastMessageTimeRef.current = now;
       
       // Update selected chat if it's the same chat
-      if (selectedChat && selectedChat.id === message.chatId) {
+      if (selectedChat && Number(selectedChat.id) === Number(message.chatId)) {
         setSelectedChat(prevChat => {
           if (!prevChat) return prevChat;
-          // Check if message already exists to avoid duplicates
-          const messageExists = prevChat.messages?.some(m => 
-            m.id === message.id || 
-            (m.id.toString().startsWith('temp-') && m.content === message.content && m.senderType === message.senderType)
-          );
-          if (messageExists) return prevChat;
-          
-          return {
-            ...prevChat,
-            messages: [...(prevChat.messages || []), message]
-          };
+          const messages = prevChat.messages || [];
+          // 1) Заменяем temp-сообщение, если совпадает контент (эхо админского)
+          if (message.senderType === 'ADMIN') {
+            const idx = messages.findIndex(m => m.id.toString().startsWith('temp-') && m.content === message.content);
+            if (idx !== -1) {
+              const updated = [...messages];
+              updated[idx] = message;
+              return { ...prevChat, messages: updated };
+            }
+          }
+          // 2) Если уже есть такое id — не добавляем
+          const existsById = messages.some(m => String(m.id) === String(message.id));
+          if (existsById) return prevChat;
+          // 3) В остальных случаях — добавляем
+          return { ...prevChat, messages: [...messages, message] };
         });
         
         // Auto-scroll to bottom after new message
@@ -232,6 +232,77 @@ const SupportPage: React.FC = () => {
     }, 2000);
   };
 
+  const compressImageToDataUrl = (file: File, maxWidth = 1280, maxHeight = 1280, quality = 0.7): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => {
+        img.onload = () => {
+          let { width, height } = img;
+          const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(width * scale);
+          canvas.height = Math.round(height * scale);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('no ctx'));
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('img error'));
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error('read error'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const onFilesSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const maxSize = 600 * 1024; // ~600KB на вложение, чтобы не упираться в 413
+    const previews: string[] = [];
+    for (const file of Array.from(files)) {
+      const isImage = file.type.startsWith('image/');
+      if (isImage) {
+        try {
+          const dataUrl = await compressImageToDataUrl(file);
+          const size = Math.ceil((dataUrl.length * 3) / 4);
+          if (size <= maxSize) previews.push(dataUrl);
+        } catch {}
+      } else {
+        if (file.size <= maxSize) {
+          const url = URL.createObjectURL(file);
+          previews.push(url);
+        }
+      }
+    }
+    setAttachmentsPreview(prev => [...prev, ...previews]);
+  };
+
+  const clearPendingAttachments = () => {
+    setAttachmentsPreview([]);
+  };
+
+  const renderAttachments = (attachments?: string[]) => {
+    if (!attachments || attachments.length === 0) return null;
+    return (
+      <div className="attachments" style={{ marginTop: '8px' }}>
+        {attachments.map((att, idx) => {
+          const isImage = /^data:image\//.test(att) || /\.(png|jpe?g|gif|webp)$/i.test(att);
+          return (
+            <div key={idx} style={{ marginTop: '6px' }}>
+              {isImage ? (
+                <img src={att} alt="attachment" style={{ maxWidth: '220px', borderRadius: '8px' }} />
+              ) : (
+                <a href={att} target="_blank" rel="noreferrer">Файл</a>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
 
   const loadChats = async (silent = false) => {
     if (!token) return;
@@ -265,19 +336,20 @@ const SupportPage: React.FC = () => {
   };
 
   const sendMessage = async () => {
-    if (!token || !selectedChat || !newMessage.trim()) return;
+    if (!token || !selectedChat || (!newMessage.trim() && attachmentsPreview.length === 0)) return;
     
     const messageContent = newMessage.trim();
+    const finalContent = messageContent || (attachmentsPreview.length > 0 ? 'Вложение' : '');
     setNewMessage(''); // Clear input immediately
     
     // Add message locally for immediate feedback
-    const tempMessage = {
-      id: -Date.now(), // Use negative timestamp as temp ID
+    const tempMessage: any = {
+      id: `temp-${Date.now()}` as any,
       chatId: selectedChat.id,
-      content: messageContent,
+      content: finalContent,
       senderType: 'ADMIN' as const,
       senderId: undefined,
-      attachments: [],
+      attachments: attachmentsPreview,
       isRead: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -299,9 +371,10 @@ const SupportPage: React.FC = () => {
     try {
       console.log('Sending message:', messageContent);
       const response = await supportApi.sendSupportMessage(
-        token, 
-        selectedChat.id, 
-        messageContent
+        token,
+        selectedChat.id,
+        finalContent,
+        attachmentsPreview
       );
       console.log('Send message response:', response);
       
@@ -313,16 +386,27 @@ const SupportPage: React.FC = () => {
           if (!prevChat) return prevChat;
           return {
             ...prevChat,
-            messages: prevChat.messages?.map(m => 
-              m.id === tempMessage.id ? { 
-                ...m, 
-                id: response.data!.id, 
-                createdAt: response.data!.createdAt
-              } : m
-            ) || []
+            messages: (() => {
+              const updated = prevChat.messages?.map(m => 
+                String(m.id) === String(tempMessage.id) 
+                  ? { ...m, id: response.data!.id as any, createdAt: response.data!.createdAt } 
+                  : m
+              ) || [];
+              // Удалим возможные дубли с тем же id
+              const seen = new Set<string>();
+              const dedup = updated.filter((m: any) => {
+                const key = String(m.id);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+              // Удалим все временные сообщения с тем же контентом
+              return dedup.filter((m: any) => !(m.id.toString().startsWith('temp-') && m.content === response.data!.content));
+            })()
           };
         });
         
+        clearPendingAttachments();
         // Force scroll to bottom after successful send - multiple attempts
         setTimeout(forceScrollToBottom, 50);
         setTimeout(forceScrollToBottom, 100);
@@ -482,6 +566,7 @@ const SupportPage: React.FC = () => {
                       >
                         <div className="message-content">
                           {message.content}
+                          {renderAttachments((message as any).attachments)}
                         </div>
                         <div className="message-time">
                           {formatTime(message.createdAt)}
@@ -525,6 +610,29 @@ const SupportPage: React.FC = () => {
                     }
                   }}
                 />
+                {attachmentsPreview.length > 0 && (
+                  <div style={{ position: 'absolute', bottom: '52px', left: '10px', right: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {attachmentsPreview.map((p, i) => (
+                      <div key={i} style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', border: '1px solid #e0e0e0', background: '#fafafa' }}>
+                        {/^data:image\//.test(p) ? (
+                          <img src={p} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ fontSize: 10, padding: 6 }}>файл</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className="attach-btn" title="Прикрепить файл" style={{ marginLeft: '6px', cursor: 'pointer' }}>
+                  📎
+                  <input
+                    type="file"
+                    style={{ display: 'none' }}
+                    multiple
+                    onChange={(e) => onFilesSelected(e.target.files)}
+                    accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  />
+                </label>
                 <button 
                   onClick={() => {
                     sendMessage();
@@ -533,7 +641,7 @@ const SupportPage: React.FC = () => {
                     setTimeout(forceScrollToBottom, 200);
                     setTimeout(forceScrollToBottom, 500);
                   }} 
-                  disabled={!newMessage.trim()}
+                  disabled={!newMessage.trim() && attachmentsPreview.length === 0}
                 >
                   Отправить
                 </button>

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { authApi, phoneApi, documentsApi, type User } from '../api';
 import { getTelegramInitData, getTelegramUserUnsafe, requestTelegramContact, showTelegramAlert } from '../telegram';
 import { getAuthToken, setAuthToken, removeAuthToken } from '../api';
+import PhoneRequestModal from '../components/PhoneRequestModal';
+import UserDataForm from '../components/UserDataForm';
+import RentalCountdown from '../components/RentalCountdown';
 import './ProfilePage.css';
 
 const ProfilePage: React.FC = () => {
@@ -14,6 +17,11 @@ const ProfilePage: React.FC = () => {
   const [documentStatus, setDocumentStatus] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
+  
+  // New modal states
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [showUserDataModal, setShowUserDataModal] = useState(false);
+  const [activeRental, setActiveRental] = useState<any>(null);
 
   useEffect(() => {
     checkAuth();
@@ -224,12 +232,12 @@ const ProfilePage: React.FC = () => {
 
     setPaymentsLoading(true);
     try {
-      const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 
         (window.location.hostname === 'app.beripritsep.ru' 
-          ? 'https://api.beripritsep.ru/api' 
-          : 'http://localhost:8080/api');
+          ? 'https://api.beripritsep.ru' 
+          : 'http://localhost:8080');
 
-      const response = await fetch(`${API_BASE_URL}/payments/user/${user.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/payments/user/${user.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -253,6 +261,55 @@ const ProfilePage: React.FC = () => {
     removeAuthToken();
     setUser(null);
     showTelegramAlert('Вы вышли из аккаунта');
+  };
+
+  // New modal handlers
+  const handlePhoneSubmit = async (phone: string) => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const response = await phoneApi.updatePhone(phone, token);
+      if (response.success) {
+        showTelegramAlert('Номер телефона сохранен!');
+        setShowPhoneModal(false);
+        // Refresh user data
+        await checkAuth();
+      } else {
+        showTelegramAlert(response.error || 'Ошибка сохранения номера');
+      }
+    } catch (error) {
+      console.error('Phone update error:', error);
+      showTelegramAlert('Ошибка сохранения номера телефона');
+    }
+  };
+
+  const handleUserDataSubmit = async (data: any) => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const response = await authApi.updateProfile(data, token);
+      if (response.success) {
+        showTelegramAlert('Данные сохранены!');
+        setShowUserDataModal(false);
+        // Refresh user data
+        await checkAuth();
+      } else {
+        showTelegramAlert(response.error || 'Ошибка сохранения данных');
+      }
+    } catch (error) {
+      console.error('User data save error:', error);
+      showTelegramAlert('Ошибка сохранения данных');
+    }
+  };
+
+  const handleExtendRental = () => {
+    showTelegramAlert('Функция продления аренды будет доступна в ближайшее время');
+  };
+
+  const handleTimeUp = () => {
+    showTelegramAlert('Время аренды истекло! Пожалуйста, верните прицеп.');
   };
 
   const getVerificationStatusText = (status: User['verificationStatus']) => {
@@ -501,7 +558,56 @@ const ProfilePage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Active Rental Countdown */}
+        {activeRental && (
+          <div className="profile-section">
+            <h2>Активная аренда</h2>
+            <RentalCountdown
+              startTime={new Date(activeRental.startTime)}
+              endTime={new Date(activeRental.endTime)}
+              onTimeUp={handleTimeUp}
+              onExtendRental={handleExtendRental}
+            />
+          </div>
+        )}
+
+        {/* Missing Data Actions */}
+        {user && (
+          <div className="profile-section">
+            <h2>Завершите регистрацию</h2>
+            <div className="registration-actions">
+              {!user.phone && (
+                <button 
+                  className="btn-primary"
+                  onClick={() => setShowPhoneModal(true)}
+                >
+                  📱 Добавить номер телефона
+                </button>
+              )}
+              <button 
+                className="btn-primary"
+                onClick={() => setShowUserDataModal(true)}
+              >
+                📋 Заполнить личные данные
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Modals */}
+      <PhoneRequestModal
+        isOpen={showPhoneModal}
+        onClose={() => setShowPhoneModal(false)}
+        onPhoneSubmit={handlePhoneSubmit}
+      />
+
+      <UserDataForm
+        isOpen={showUserDataModal}
+        onClose={() => setShowUserDataModal(false)}
+        onSubmit={handleUserDataSubmit}
+      />
     </div>
   );
 };

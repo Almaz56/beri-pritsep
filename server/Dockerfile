@@ -26,8 +26,8 @@ RUN npx tsc src/production-server.ts --outDir dist --target es2020 --module comm
 # Production stage
 FROM node:18-alpine AS production
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl
+# Install system certs and OpenSSL for Prisma and HTTPS fetch
+RUN apk add --no-cache openssl ca-certificates && update-ca-certificates
 
 # Create app user
 RUN addgroup -g 1001 -S nodejs
